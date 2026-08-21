@@ -5,52 +5,120 @@
 
 
 TensorEngine* T(TensorEngine * t) {
-    if (t->ndim != 2) {
-        fprintf(stderr, "Transpose only supports 2D tensors\n");
-        return NULL;
+    /* =========================
+       1D Tensor
+       ========================= */
+    if (t->ndim == 1) {
+
+        size_t rows = t->shape[0];
+        size_t cols = 1;
+
+        f64 *result_array =
+            (f64*) malloc(sizeof(f64) * (t->size + 1));
+
+        if (!result_array) {
+            fprintf(stderr,
+                    "Memory allocation failed for transpose result\n");
+            return NULL;
+        }
+
+        for (size_t i = 0; i < t->size; i++) {
+            result_array[i] = t->tensor[i];
+        }
+
+        result_array[t->size] = E;
+
+        int *shape_terminated =
+            (int*) malloc(sizeof(int) * 3);
+
+        if (!shape_terminated) {
+            fprintf(stderr,
+                    "Memory allocation failed for new shape, "
+                    "while doing transpose\n");
+
+            free(result_array);
+            return NULL;
+        }
+
+        shape_terminated[0] = (int)rows;
+        shape_terminated[1] = (int)cols;
+        shape_terminated[2] = N;
+
+        TensorEngine *result =
+            tensor(result_array, shape_terminated, t->__GPU__);
+
+        free(result_array);
+        free(shape_terminated);
+
+        return result;
     }
 
-    size_t rows = (size_t) t->shape[0];
-    size_t cols = (size_t) t->shape[1];
 
-    // +1 slot for the E (-INFINITY) sentinel
-    f64 *result_array = (f64*) malloc(sizeof(f64) * (t->size + 1));
-    if (!result_array) {
-        fprintf(stderr, "Memory allocation failed for transpose result\n");
-        return NULL;
-    }
+    /* =========================
+       2D Tensor
+       ========================= */
+    if (t->ndim == 2) {
 
-    if (t->__GPU__) {
-        runTransposeDoubleOp(t->tensor, result_array, rows, cols);
-    }
-    else {
-        for (size_t i = 0; i < rows; i++) {
-            for (size_t j = 0; j < cols; j++) {
-                result_array[j * rows + i] = t->tensor[i * cols + j];
+        size_t rows = (size_t)t->shape[0];
+        size_t cols = (size_t)t->shape[1];
+
+        f64 *result_array =
+            (f64*) malloc(sizeof(f64) * (t->size + 1));
+
+        if (!result_array) {
+            fprintf(stderr,
+                    "Memory allocation failed for transpose result\n");
+            return NULL;
+        }
+
+        if (t->__GPU__) {
+
+            runTransposeDoubleOp(
+                t->tensor,
+                result_array,
+                rows,
+                cols
+            );
+        }
+        else {
+
+            for (size_t i = 0; i < rows; i++) {
+                for (size_t j = 0; j < cols; j++) {
+
+                    result_array[j * rows + i] =
+                        t->tensor[i * cols + j];
+                }
             }
         }
-    }
 
-    result_array[t->size] = E;
+        result_array[t->size] = E;
 
-    // transposed shape: [cols, rows], N-terminated
-    int *shape_terminated = (int*) malloc(sizeof(int) * (t->ndim + 1));
-    if (!shape_terminated) {
-        fprintf(stderr, "Memory allocation failed for new shape, while doing transpose\n");
+        int *shape_terminated =
+            (int*) malloc(sizeof(int) * (t->ndim + 1));
+
+        if (!shape_terminated) {
+            fprintf(stderr,
+                    "Memory allocation failed for new shape, "
+                    "while doing transpose\n");
+
+            free(result_array);
+            return NULL;
+        }
+
+        shape_terminated[0] = (int)cols;
+        shape_terminated[1] = (int)rows;
+        shape_terminated[2] = N;
+
+        TensorEngine *result =
+            tensor(result_array, shape_terminated, t->__GPU__);
+
         free(result_array);
-        return NULL;
+        free(shape_terminated);
+
+        return result;
     }
-
-    shape_terminated[0] = (int) cols;
-    shape_terminated[1] = (int) rows;
-    shape_terminated[2] = N;
-
-    TensorEngine *result = tensor(result_array, shape_terminated, t->__GPU__);
-
-    free(result_array);
-    free(shape_terminated);
-
-    return result;
+    fprintf(stderr,"Transpose only supports 1D and 2D tensors\n");
+    return NULL;
 }
 
 TensorEngine* arange(f64 start, f64 end, f64 step, bool gpu) {

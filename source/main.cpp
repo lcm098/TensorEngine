@@ -93,9 +93,30 @@ int main()
     // free_tensor(t2);
     // free_tensor(t3);
 
-    TensorEngine* t1 = linspace(1.0, 1.1, 10, false);
+    // TensorEngine* t1 = linspace(1.0, 1.1, 10, false);
+    // p(t1);
+
+    // t1 = T(t1);
+    // p(t1);
+
+    // free(t1);
+
+
+    TensorEngine* t1 = linspace(1.0, 10.0, 50, false);
+    int shape[] = {2, 25};
+
+    t1 = reshape(t1, shape, 2);
     p(t1);
-    free(t1);
+
+    TensorEngine* t2 = linspace(1.0, 10.0, 50, false);
+    t2 = reshape(t2, shape, 2);
+    t2 = T(t2);
+    p(t2);
+
+    
+
+    free_tensor(t1);
+    free_tensor(t2);
 
     return 0;
 }
