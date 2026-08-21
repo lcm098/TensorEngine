@@ -30,7 +30,7 @@ size_t calculate_ndim(int shape[])
 {
 	size_t ndim = 0;
 
-	while (shape[ndim] != -1) {
+	while (shape[ndim] != N) {
 		ndim++;
 	}
 
@@ -40,7 +40,7 @@ size_t calculate_ndim(int shape[])
 size_t calculate_elements(f64 array[])
 {
 	size_t elements = 0;
-	while (array[elements] != -INFINITY) {
+	while (array[elements] != E) {
 		elements++;
 	}
 	return elements;

@@ -12,10 +12,11 @@ extern "C" {
 #include <cstdio>
 #include <cmath>
 #include <cstddef>
+#include <climits>
 
 typedef double f64;
 #define E -INFINITY
-#define N -1
+#define N INT_MIN
 
 #ifdef __cplusplus
 }

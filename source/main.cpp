@@ -21,5 +21,21 @@ int main()
     free_tensor(t2);
     free_tensor(t3);
 
+    f64 arr[] = {1, E};
+    int s1[] = {1, 1, 1, 1, N};
+
+    TensorEngine *t4 = tensor(arr, s1, false);
+    TensorEngine *t5 = tensor(arr, s1, false);
+    p(t4);
+    p(t5);
+
+    TensorEngine *sum = add(t4, t5);
+    p(sum);
+
+    free_tensor(t4);
+    free_tensor(t5);
+    free_tensor(sum);
+
+
     return 0;
 }
