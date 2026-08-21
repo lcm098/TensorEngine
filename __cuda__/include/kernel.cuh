@@ -25,4 +25,18 @@ __global__ void subKernelD(const double *a, const double *b, double *c, int n);
 __global__ void mulKernelD(const double *a, const double *b, double *c, int n);
 __global__ void divKernelD(const double *a, const double *b, double *c, int n);
 
+__global__ void addBroadcastKernelD(
+    const double *t1, const double *t2, double *out,
+    const int *shape1, const size_t *strides1, size_t ndim1, size_t pad1,
+    const int *shape2, const size_t *strides2, size_t ndim2, size_t pad2,
+    const int *out_shape, size_t out_ndim,
+    size_t out_size);
+
+void runBroadcastDoubleOp(
+    const double *t1_dev, const double *t2_dev, double *h_out,
+    int *shape1, size_t ndim1, size_t pad1,
+    int *shape2, size_t ndim2, size_t pad2,
+    int *out_shape, size_t out_ndim,
+    size_t out_size);
+
 #endif

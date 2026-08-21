@@ -10,7 +10,7 @@ extern "C" {
 #endif
 
 TensorEngine* add(TensorEngine* t1, TensorEngine* t2);
-
+TensorEngine* add_broad(TensorEngine* t1, TensorEngine* t2);
 
 #ifdef __cplusplus
 }
