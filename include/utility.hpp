@@ -9,6 +9,6 @@
 TensorEngine* T(TensorEngine * t);
 TensorEngine* arange(f64 start, f64 end, f64 step, bool gpu);
 TensorEngine* reshape(TensorEngine* t, int *new_shape, size_t new_ndim);
-
+TensorEngine* linspace(f64 start, f64 end, int num, bool __GPU__) ;
 
 #endif

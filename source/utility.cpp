@@ -1,5 +1,7 @@
 
 #include "../include/utility.hpp"
+#include <cstdio>
+#include <cstdlib>
 
 
 TensorEngine* T(TensorEngine * t) {
@@ -144,5 +146,39 @@ TensorEngine* reshape(TensorEngine* t, int *new_shape, size_t new_ndim) {
     free(host_data);
     free(shape_terminated);
 
+    return result;
+}
+
+
+TensorEngine* linspace(f64 start, f64 end, int num, bool __GPU__) {
+
+    if (num <= 0) {
+        fprintf(stderr, "linspace: num must be greater than 0\n");
+        return NULL;
+    }
+
+    f64 *result_array = (f64 *)malloc(sizeof(f64) * (num + 1));
+
+    if (result_array == NULL) {
+        fprintf(stderr, "memory allocation in linspace failed\n");
+        return NULL;
+    }
+
+    if (num == 1) {
+        result_array[0] = start;
+    } else {
+        f64 step = (end - start) / (num - 1);
+
+        for (int i = 0; i < num; i++) {
+            result_array[i] = start + (i * step);
+        }
+    }
+
+    result_array[num] = E;
+
+    int shape[] = {num, N};
+
+    TensorEngine *result = tensor(result_array, shape, __GPU__);
+    free(result_array);
     return result;
 }

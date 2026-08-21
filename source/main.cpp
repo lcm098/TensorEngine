@@ -2,6 +2,7 @@
 #include "../include/utils.hpp"
 #include "../include/arthematic.hpp"
 #include "../include/utility.hpp"
+#include <cstdlib>
 
 int main()
 {
@@ -74,23 +75,27 @@ int main()
     // free_tensor(t8);
 
 
-    TensorEngine* t1 = arange(1, 51, 1, true);
-    int new_shape[] = {2, 25};
-    t1 = reshape(t1, new_shape, 2);
+    // TensorEngine* t1 = arange(1, 51, 1, true);
+    // int new_shape[] = {5, 10};
+    // t1 = reshape(t1, new_shape, 2);
 
-    TensorEngine* t2 = arange(1, 51, 1, true);
-    t2 = reshape(t2, new_shape, 2);
-    t2 = T(t2);
+    // TensorEngine* t2 = arange(1, 51, 1, true);
+    // t2 = reshape(t2, new_shape, 2);
+    // t2 = T(t2);
 
-    TensorEngine* t3 = dot_prod(t1, t2);
+    // TensorEngine* t3 = dot_prod(t1, t2);
 
+    // p(t1);
+    // p(t2);
+    // p(t3);
+
+    // free_tensor(t1);
+    // free_tensor(t2);
+    // free_tensor(t3);
+
+    TensorEngine* t1 = linspace(1.0, 1.1, 10, false);
     p(t1);
-    p(t2);
-    p(t3);
-
-    free_tensor(t1);
-    free_tensor(t2);
-    free_tensor(t3);
+    free(t1);
 
     return 0;
 }
