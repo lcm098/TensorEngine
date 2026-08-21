@@ -5,6 +5,7 @@
 #include "../include/utils.hpp"
 #include "../include/common.hpp"
 #include "../include/arthematic.hpp"
+#include "../include/utility.hpp"
 
 #endif
 

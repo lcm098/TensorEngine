@@ -13,6 +13,7 @@ extern "C" {
 #include <cmath>
 #include <cstddef>
 #include <climits>
+#include <cstring>
 
 typedef double f64;
 #define E -INFINITY
