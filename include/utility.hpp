@@ -16,6 +16,8 @@ TensorEngine* arange(f64 start, f64 end, f64 step, bool gpu);
 TensorEngine* reshape(TensorEngine* t, int *new_shape, size_t new_ndim);
 TensorEngine* linspace(f64 start, f64 end, int num, bool __GPU__) ;
 TensorEngine* slice(TensorEngine* t, int indices[][3], size_t num_slices, int offset);
+TensorEngine* extract(TensorEngine* t1, int expected_size);
+
 
 #ifdef __cplusplus
 }

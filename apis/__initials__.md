@@ -699,6 +699,55 @@ free_tensor(t);
 free_tensor(col);
 ```
 
+## extract
+```
+The `extract` function squeezes off *leading* dimensions of size `1` from a 
+tensor's shape, without altering the underlying data or its element order. 
+It does not flatten the tensor into 1D — trailing dimensions are preserved 
+as-is; only leading `1`-sized dimensions are dropped.
+- The second argument `expected_size` is a safety check: it must equal the 
+  tensor's total element count (`t1->size`), or `NULL` is returned with an 
+  error. It is not used for any computation — pass `t1->size` directly to 
+  avoid having to compute it by hand.
+- If every dimension in the tensor is `1`, one dimension is preserved so the 
+  result is never a 0-dimensional tensor.
+- Since leading `1`-sized dimensions never affect memory layout in row-major 
+  order, the underlying data is copied unchanged; only the shape metadata 
+  is rebuilt.
+Supports both CPU and GPU execution.
+```
+ 
+> Signature
+```
+TensorEngine* extract(TensorEngine *t1, int expected_size);
+```
+ 
+> Example
+```
+f64 a[] = {1.0, 2.0, 3.0, 4.0, E};
+int shape[] = {1, 1, 1, 4, N};
+TensorEngine* t = tensor(a, shape, false);
+ 
+TensorEngine* res = extract(t, t->size);
+p(res);
+ 
+free_tensor(t);
+free_tensor(res);
+```
+ 
+> Second Example
+```
+TensorEngine* t = arange(1.0, 9.0, 1.0, false);
+int shape[] = {1, 1, 1, 2, 2, 2, N};
+t = reshape(t, shape, 6);
+ 
+TensorEngine* res = extract(t, t->size);
+p(res);
+ 
+free_tensor(t);
+free_tensor(res);
+```
+
 ## arange
 ```
 The `arange` function creates a 1D tensor containing evenly spaced values within 

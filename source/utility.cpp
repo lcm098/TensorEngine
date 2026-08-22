@@ -477,3 +477,64 @@ TensorEngine* slice(TensorEngine* t, int indices[][3], size_t num_slices, int of
 
     return result;
 }
+
+TensorEngine* extract(TensorEngine* t1, int expected_size) {
+    if (t1 == nullptr) {
+        fprintf(stderr, "extract: null tensor argument\n");
+        return NULL;
+    }
+
+    if ((size_t) expected_size != t1->size) {
+        fprintf(stderr, "extract: expected size %d does not match tensor size %zu\n",
+                expected_size, t1->size);
+        return NULL;
+    }
+
+    // count leading dims of size 1
+    size_t leading = 0;
+    while (leading < t1->ndim && t1->shape[leading] == 1) {
+        leading++;
+    }
+
+    // if every dim is 1, keep at least the last dim (result is a 1-element tensor)
+    size_t new_ndim = t1->ndim - leading;
+    if (new_ndim == 0) {
+        leading = t1->ndim - 1;
+        new_ndim = 1;
+    }
+
+    // squeezing leading 1-dims never changes element order (row-major),
+    // so data is a straight copy, just like reshape()
+    f64 *host_data = (f64*) malloc(sizeof(f64) * (t1->size + 1));
+    if (!host_data) {
+        fprintf(stderr, "Memory allocation failed for extract data\n");
+        return NULL;
+    }
+
+    if (t1->__GPU__) {
+        cudaMemcpy(host_data, t1->tensor, sizeof(f64) * t1->size, cudaMemcpyDeviceToHost);
+    }
+    else {
+        memcpy(host_data, t1->tensor, sizeof(f64) * t1->size);
+    }
+    host_data[t1->size] = E;
+
+    int *shape_terminated = (int*) malloc(sizeof(int) * (new_ndim + 1));
+    if (!shape_terminated) {
+        fprintf(stderr, "Memory allocation failed for new shape, while doing extract\n");
+        free(host_data);
+        return NULL;
+    }
+
+    for (size_t i = 0; i < new_ndim; i++) {
+        shape_terminated[i] = t1->shape[leading + i];
+    }
+    shape_terminated[new_ndim] = N;
+
+    TensorEngine *result = tensor(host_data, shape_terminated, t1->__GPU__);
+
+    free(host_data);
+    free(shape_terminated);
+
+    return result;
+}

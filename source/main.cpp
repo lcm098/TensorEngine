@@ -20,13 +20,44 @@ int main()
     //     {N, N, N}, // Dim 4: all
     //     {N, N, N}, // Dim 5: all
     // };
-    // TensorEngine* sl6d = slice(tx, s6d);
+    // TensorEngine* sl6d = slice(tx, s6d, 5, 0);
+    // TensorEngine* ex = extract(sl6d, sl6d->size);
 
     // p(tx);
     // p(sl6d);
+    // p(ex);
 
     // free_tensor(tx);
     // free_tensor(sl6d);
+    // free_tensor(ex);
+
+
+
+
+    TensorEngine* t = arange(1.0, 8641.0, 1.0, false);
+    int shape7d[] = {4, 3, 5, 6, 2, 3, 4, N};
+    t = reshape(t, shape7d, 7);
+
+    int s7d[][3] = {
+        {2, 3, 1},  // Dim 0: index 2 only
+        {1, 2, 1},  // Dim 1: index 1 only
+        {4, 5, 1},  // Dim 2: index 4 only
+        {0, 1, 1},  // Dim 3: index 0 only
+        {N, N, N},  // Dim 4: all (size 2)
+        {N, N, N},  // Dim 5: all (size 3)
+        {N, N, N},  // Dim 6: all (size 4)
+    };
+    TensorEngine* sl = slice(t, s7d, 6, 0);
+    p(sl);
+    TensorEngine* ex = extract(sl, sl->size);
+
+    p(ex);
+
+    free_tensor(t);
+    free_tensor(sl);
+    free_tensor(ex);
+
+
 
 
     // TensorEngine* t = arange(10.0, 0.0, -2.0, true);
@@ -72,9 +103,9 @@ int main()
     // free_tensor(t3);
     // free_tensor(t4);
 
-    TensorEngine* tx = empty((int[]){3, 3, N}, false);
-    p(tx);
-    free_tensor(tx);
+    // TensorEngine* tx = empty((int[]){3, 3, N}, false);
+    // p(tx);
+    // free_tensor(tx);
 
     return 0;
 }

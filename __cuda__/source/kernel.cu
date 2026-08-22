@@ -283,6 +283,27 @@ __global__ void transposeKernelD(const double *in, double *out, size_t rows, siz
     out[j * rows + i] = in[i * cols + j];
 }
 
+__global__ void extractKernelD(const double *in, double *out, size_t count, size_t stride) {
+    size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= count) return;
+    out[idx] = in[idx * stride];
+}
+
+void runExtractDoubleOp(const double *in_dev, double *h_out, size_t count, size_t stride) {
+    double *d_out;
+    cudaMalloc(&d_out, sizeof(double) * count);
+
+    int threads = 256;
+    int blocks = (int)((count + threads - 1) / threads);
+
+    extractKernelD<<<blocks, threads>>>(in_dev, d_out, count, stride);
+
+    cudaDeviceSynchronize();
+    cudaMemcpy(h_out, d_out, sizeof(double) * count, cudaMemcpyDeviceToHost);
+
+    cudaFree(d_out);
+}
+
 void runTransposeDoubleOp(const double *h_in, double *h_out, size_t rows, size_t cols) {
     size_t total = rows * cols;
 

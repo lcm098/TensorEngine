@@ -108,11 +108,16 @@ void runSliceNDDoubleOp(
     const size_t *h_in_strides,
     const int *h_out_shape,
     size_t ndim, size_t base_offset);
+
 __global__ void sliceNDKernelD(
     const double *in, double *out,
     const int *starts, const int *steps,
     const size_t *in_strides,
     const int *out_shape,
     size_t ndim, size_t out_size, size_t base_offset);
+
+__global__ void extractKernelD(const double *in, double *out, size_t count, size_t stride);
+void runExtractDoubleOp(const double *in_dev, double *h_out, size_t count, size_t stride);
+
 
 #endif
