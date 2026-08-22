@@ -296,3 +296,184 @@ TensorEngine* linspace(f64 start, f64 end, int num, bool __GPU__) {
     free(result_array);
     return result;
 }
+
+TensorEngine* slice(TensorEngine* t, int indices[][3], size_t num_slices, int offset) {
+    if (t == nullptr || t->tensor == nullptr) {
+        fprintf(stderr, "slice: invalid null tensor\n");
+        return NULL;
+    }
+
+    if (t->ndim == 0) {
+        fprintf(stderr, "slice: tensor has 0 dimensions\n");
+        return NULL;
+    }
+
+    size_t effective_num_slices = (num_slices == 0) ? t->ndim : num_slices;
+    if (effective_num_slices > t->ndim) {
+        effective_num_slices = t->ndim;
+    }
+
+    int *starts = (int*) malloc(sizeof(int) * t->ndim);
+    int *steps  = (int*) malloc(sizeof(int) * t->ndim);
+    int *shape_terminated = (int*) malloc(sizeof(int) * (t->ndim + 1));
+
+    if (!starts || !steps || !shape_terminated) {
+        fprintf(stderr, "Memory allocation failed in slice\n");
+        free(starts);
+        free(steps);
+        free(shape_terminated);
+        return NULL;
+    }
+
+    size_t out_size = 1;
+
+    for (size_t d = 0; d < t->ndim; d++) {
+        int dim_len = t->shape[d];
+        int raw_start = N;
+        int raw_stop  = N;
+        int raw_step  = N;
+
+        if (indices != nullptr && d < effective_num_slices) {
+            raw_start = indices[d][0];
+            raw_stop  = indices[d][1];
+            raw_step  = indices[d][2];
+        }
+
+        int step = (raw_step == N) ? 1 : raw_step;
+        if (step == 0) {
+            fprintf(stderr, "slice: step cannot be zero for dimension %zu\n", d);
+            free(starts);
+            free(steps);
+            free(shape_terminated);
+            return NULL;
+        }
+
+        int start, stop, out_dim_size;
+
+        if (step > 0) {
+            if (raw_start == N) {
+                start = 0;
+            } else if (raw_start < 0) {
+                start = raw_start + dim_len;
+                if (start < 0) start = 0;
+            } else {
+                start = raw_start;
+                if (start > dim_len) start = dim_len;
+            }
+
+            if (raw_stop == N) {
+                stop = dim_len;
+            } else if (raw_stop < 0) {
+                stop = raw_stop + dim_len;
+                if (stop < 0) stop = 0;
+            } else {
+                stop = raw_stop;
+                if (stop > dim_len) stop = dim_len;
+            }
+
+            if (start >= stop) {
+                out_dim_size = 0;
+            } else {
+                out_dim_size = (stop - start + step - 1) / step;
+            }
+        } else {
+            // step < 0
+            if (raw_start == N) {
+                start = dim_len - 1;
+            } else if (raw_start < 0) {
+                start = raw_start + dim_len;
+                if (start < -1) start = -1;
+            } else {
+                start = raw_start;
+                if (start >= dim_len) start = dim_len - 1;
+            }
+
+            if (raw_stop == N) {
+                stop = -1;
+            } else if (raw_stop < 0) {
+                stop = raw_stop + dim_len;
+                if (stop < -1) stop = -1;
+            } else {
+                stop = raw_stop;
+                if (stop >= dim_len) stop = dim_len - 1;
+            }
+
+            if (start <= stop) {
+                out_dim_size = 0;
+            } else {
+                out_dim_size = (start - stop + (-step) - 1) / (-step);
+            }
+        }
+
+        starts[d] = start;
+        steps[d]  = step;
+        shape_terminated[d] = out_dim_size;
+        out_size *= (size_t) out_dim_size;
+    }
+
+    shape_terminated[t->ndim] = N;
+
+    f64 *result_array = (f64*) malloc(sizeof(f64) * (out_size + 1));
+    if (!result_array) {
+        fprintf(stderr, "Memory allocation failed for slice result\n");
+        free(starts);
+        free(steps);
+        free(shape_terminated);
+        return NULL;
+    }
+
+    if (out_size > 0) {
+        if (t->__GPU__) {
+            size_t *in_strides = (size_t*) malloc(sizeof(size_t) * t->ndim);
+            if (!in_strides) {
+                fprintf(stderr, "Memory allocation failed for in_strides\n");
+                free(starts);
+                free(steps);
+                free(shape_terminated);
+                free(result_array);
+                return NULL;
+            }
+            for (size_t i = 0; i < t->ndim; i++) {
+                in_strides[i] = (size_t) t->strides[i];
+            }
+
+            runSliceNDDoubleOp(
+                t->tensor,
+                t->size,
+                result_array,
+                out_size,
+                starts,
+                steps,
+                in_strides,
+                shape_terminated,
+                t->ndim,
+                (size_t) offset
+            );
+
+            free(in_strides);
+        } else {
+            for (size_t linear = 0; linear < out_size; linear++) {
+                size_t rem = linear;
+                size_t in_offset = (size_t) offset;
+                for (size_t d = t->ndim; d-- > 0; ) {
+                    size_t coord = rem % (size_t) shape_terminated[d];
+                    rem /= (size_t) shape_terminated[d];
+                    int in_coord = starts[d] + (int) coord * steps[d];
+                    in_offset += (size_t) in_coord * (size_t) t->strides[d];
+                }
+                result_array[linear] = t->tensor[in_offset];
+            }
+        }
+    }
+
+    result_array[out_size] = E;
+
+    TensorEngine *result = tensor(result_array, shape_terminated, t->__GPU__);
+
+    free(starts);
+    free(steps);
+    free(result_array);
+    free(shape_terminated);
+
+    return result;
+}

@@ -101,4 +101,18 @@ __global__ void transposeNDKernelD(
     const int *out_shape, const int *axes,
     size_t ndim, size_t total_size);
 
+void runSliceNDDoubleOp(
+    const double *h_in, size_t in_size,
+    double *h_out, size_t out_size,
+    const int *h_starts, const int *h_steps,
+    const size_t *h_in_strides,
+    const int *h_out_shape,
+    size_t ndim, size_t base_offset);
+__global__ void sliceNDKernelD(
+    const double *in, double *out,
+    const int *starts, const int *steps,
+    const size_t *in_strides,
+    const int *out_shape,
+    size_t ndim, size_t out_size, size_t base_offset);
+
 #endif

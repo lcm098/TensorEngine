@@ -365,3 +365,70 @@ void runTransposeNDDoubleOp(
     cudaFree(d_axes);
     cudaFree(d_in_strides);
 }
+
+__global__ void sliceNDKernelD(
+    const double *in, double *out,
+    const int *starts, const int *steps,
+    const size_t *in_strides,
+    const int *out_shape,
+    size_t ndim, size_t out_size, size_t base_offset)
+{
+    size_t linear = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
+    if (linear >= out_size) return;
+
+    size_t rem = linear;
+    size_t in_offset = base_offset;
+
+    for (size_t d = ndim; d-- > 0; ) {
+        size_t coord = rem % (size_t)out_shape[d];
+        rem /= (size_t)out_shape[d];
+        int in_coord = starts[d] + (int)coord * steps[d];
+        in_offset += (size_t)in_coord * in_strides[d];
+    }
+
+    out[linear] = in[in_offset];
+}
+
+void runSliceNDDoubleOp(
+    const double *h_in, size_t in_size,
+    double *h_out, size_t out_size,
+    const int *h_starts, const int *h_steps,
+    const size_t *h_in_strides,
+    const int *h_out_shape,
+    size_t ndim, size_t base_offset)
+{
+    double *d_in, *d_out;
+    int *d_starts, *d_steps, *d_out_shape;
+    size_t *d_in_strides;
+
+    CUDA_CHECK(cudaMalloc(&d_in, sizeof(double) * in_size));
+    CUDA_CHECK(cudaMalloc(&d_out, sizeof(double) * out_size));
+    CUDA_CHECK(cudaMalloc(&d_starts, sizeof(int) * ndim));
+    CUDA_CHECK(cudaMalloc(&d_steps, sizeof(int) * ndim));
+    CUDA_CHECK(cudaMalloc(&d_out_shape, sizeof(int) * ndim));
+    CUDA_CHECK(cudaMalloc(&d_in_strides, sizeof(size_t) * ndim));
+
+    CUDA_CHECK(cudaMemcpy(d_in, h_in, sizeof(double) * in_size, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_starts, h_starts, sizeof(int) * ndim, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_steps, h_steps, sizeof(int) * ndim, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_out_shape, h_out_shape, sizeof(int) * ndim, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_in_strides, h_in_strides, sizeof(size_t) * ndim, cudaMemcpyHostToDevice));
+
+    int threads = 256;
+    int blocks = (int)((out_size + threads - 1) / threads);
+
+    sliceNDKernelD<<<blocks, threads>>>(
+        d_in, d_out, d_starts, d_steps, d_in_strides, d_out_shape, ndim, out_size, base_offset
+    );
+
+    CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaDeviceSynchronize());
+    CUDA_CHECK(cudaMemcpy(h_out, d_out, sizeof(double) * out_size, cudaMemcpyDeviceToHost));
+
+    cudaFree(d_in);
+    cudaFree(d_out);
+    cudaFree(d_starts);
+    cudaFree(d_steps);
+    cudaFree(d_out_shape);
+    cudaFree(d_in_strides);
+}
