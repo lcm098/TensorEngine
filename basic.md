@@ -18,6 +18,11 @@ negative infinity (`-INFINITY`) and 'N' represents the minimum integer value
 (`INT_MIN`); these serve as safety guards.
 ```
 
+> Signature
+```
+TensorEngine* tensor(f64 array_[], int shape_[], bool __GPU__);
+```
+
 > Example
 ```
 f64 array[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, E};
@@ -32,6 +37,7 @@ free_tensor(t1);
 TensorEngine* t1 = tensor((f64[]){1, 2, 3, 5, 6, E}, (int[]){1, 6, N}, false);
 
 p(t1);
+free_tensor(t1);
 ```
 
 ## p
@@ -43,6 +49,11 @@ strides. In addition to displaying the contents, `p` prints the total element
 `size`, number of dimensions (`ndim`), `shape` array, `strides` array, and the 
 `__gpu__` execution target flag. If the provided tensor pointer is `NULL` or 
 contains an invalid data buffer, an error message is printed to `stderr`.
+```
+
+> Signature
+```
+void p(TensorEngine *tensor);
 ```
 
 > Example
@@ -71,6 +82,11 @@ The `free_tensor` function releases all heap-allocated memory associated with a
 struct itself. If a `nullptr` is passed, the function returns safely without 
 performing any action. Always call `free_tensor` when a tensor is no longer 
 needed to prevent memory leaks.
+```
+
+> Signature
+```
+void free_tensor(TensorEngine *t);
 ```
 
 > Example
@@ -103,6 +119,11 @@ reported to `stderr` and `NULL` is returned. If both tensors have their `__GPU__
 flag set to `true`, the addition is executed on the GPU using a CUDA kernel; 
 otherwise, it is computed on the CPU. A newly allocated `TensorEngine` pointer 
 containing the result is returned.
+```
+
+> Signature
+```
+TensorEngine* add(TensorEngine* t1, TensorEngine* t2);
 ```
 
 > Example
@@ -145,6 +166,11 @@ on the GPU via CUDA kernels; otherwise, computation runs on the CPU. Returns a
 newly created `TensorEngine` containing the difference values.
 ```
 
+> Signature
+```
+TensorEngine* sub(TensorEngine* t1, TensorEngine* t2);
+```
+
 > Example
 ```
 f64 a[] = {10.0, 20.0, 30.0, 40.0, E};
@@ -183,6 +209,11 @@ dimension counts. If shape verification fails, `NULL` is returned. If both
 operands are configured for the GPU (`__GPU__ = true`), the operation is 
 executed in parallel on the GPU; otherwise, standard CPU execution is used. 
 Returns a new `TensorEngine` containing the multiplied values.
+```
+
+> Signature
+```
+TensorEngine* mlt(TensorEngine* t1, TensorEngine* t2);
 ```
 
 > Example
@@ -225,6 +256,11 @@ or NaN. When both tensors are targeted for GPU execution, the calculation runs
 on the GPU; otherwise, it executes on the CPU. Returns a new `TensorEngine` pointer.
 ```
 
+> Signature
+```
+TensorEngine* divt(TensorEngine* t1, TensorEngine* t2);
+```
+
 > Example
 ```
 f64 a[] = {10.0, 20.0, 30.0, 40.0, E};
@@ -249,7 +285,7 @@ TensorEngine* t1 = tensor((f64[]){10.0, 20.0, 30.0, E}, (int[]){3, N}, false);
 TensorEngine* t2 = tensor((f64[]){2.0, 0.0, 5.0, E}, (int[]){3, N}, false);
 
 TensorEngine* result = divt(t1, t2);
-p(result);
+p(result); // result[1] will be 0.000000
 
 free_tensor(t1);
 free_tensor(t2);
@@ -263,6 +299,11 @@ of two tensors (`fmod(t1, t2)`). Both tensors must have matching shapes. The
 function includes division-by-zero protection: if a divisor element in `t2` is 
 `0.0`, the result for that element is set to `0.0`. This operation executes on 
 the CPU and returns a newly allocated `TensorEngine` pointer.
+```
+
+> Signature
+```
+TensorEngine* mod(TensorEngine* t1, TensorEngine* t2);
 ```
 
 > Example
@@ -306,6 +347,11 @@ tensors are on the GPU, a specialized broadcast CUDA kernel executes the
 operation; otherwise, it runs on the CPU.
 ```
 
+> Signature
+```
+TensorEngine* add_broad(TensorEngine* t1, TensorEngine* t2);
+```
+
 > Example
 ```
 f64 a[] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, E};
@@ -344,6 +390,11 @@ between two tensors according to standard broadcasting rules. Singleton and
 leading dimensions are stretched to match the broadcast output shape. Returns 
 `NULL` if the shapes cannot be broadcast together. Supports both CPU and GPU 
 execution depending on whether both input tensors have the `__GPU__` flag set.
+```
+
+> Signature
+```
+TensorEngine* sub_broad(TensorEngine* t1, TensorEngine* t2);
 ```
 
 > Example
@@ -387,6 +438,11 @@ computation is dispatched via a broadcast CUDA kernel. Returns the resulting
 `TensorEngine` pointer.
 ```
 
+> Signature
+```
+TensorEngine* mlt_broad(TensorEngine* t1, TensorEngine* t2);
+```
+
 > Example
 ```
 f64 a[] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, E};
@@ -427,6 +483,11 @@ for broadcasting, `NULL` is returned. Supports both GPU execution (when both
 operands have `__GPU__ = true`) and CPU execution.
 ```
 
+> Signature
+```
+TensorEngine* div_broad(TensorEngine* t1, TensorEngine* t2);
+```
+
 > Example
 ```
 f64 a[] = {10.0, 20.0, 30.0, 40.0, 50.0, 60.0, E};
@@ -465,6 +526,11 @@ The `mod_broad` function computes broadcast floating-point modulus / remainder
 by `0.0` produces `0.0` safely. The function supports GPU acceleration when 
 both tensors have `__GPU__` set to `true`, as well as CPU execution. Returns a 
 new `TensorEngine` pointer.
+```
+
+> Signature
+```
+TensorEngine* mod_broad(TensorEngine* t1, TensorEngine* t2);
 ```
 
 > Example
@@ -514,6 +580,11 @@ tensors are on the GPU (`__GPU__ = true`), the operation is accelerated using
 CUDA matrix multiplication kernels; otherwise, it is computed on the CPU.
 ```
 
+> Signature
+```
+TensorEngine* dot_prod(TensorEngine* t1, TensorEngine* t2);
+```
+
 > Example
 ```
 f64 a[] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, E};
@@ -559,6 +630,11 @@ The `T` function transposes a tensor.
 Supports both CPU and GPU execution.
 ```
 
+> Signature
+```
+TensorEngine* T(TensorEngine *t, int *axes = nullptr);
+```
+
 > Example
 ```
 f64 a[] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, E};
@@ -592,6 +668,11 @@ The `transpose` function is an alias for the `T` function. It transposes 1D,
 2D, or multidimensional tensors with optional custom axis permutations. Passing 
 `nullptr` as the `axes` argument reverses all dimensions by default. Supports 
 both CPU and GPU execution.
+```
+
+> Signature
+```
+TensorEngine* transpose(TensorEngine *t, int *axes = nullptr);
 ```
 
 > Example
@@ -630,6 +711,11 @@ the half-open interval `[start, end)` with a given `step` increment.
 Returns a newly allocated 1D `TensorEngine` pointer.
 ```
 
+> Signature
+```
+TensorEngine* arange(f64 start, f64 end, f64 step, bool gpu);
+```
+
 > Example
 ```
 TensorEngine* t = arange(0.0, 10.0, 2.0, false);
@@ -652,6 +738,11 @@ values calculated over the closed interval `[start, end]`. Both endpoints
 The parameter `num` must be greater than `0`. The fourth argument `__GPU__` 
 specifies whether the tensor is created for GPU or CPU execution. Returns a newly 
 allocated 1D `TensorEngine` pointer.
+```
+
+> Signature
+```
+TensorEngine* linspace(f64 start, f64 end, int num, bool __GPU__);
 ```
 
 > Example
@@ -677,6 +768,11 @@ exactly equal the original tensor's total size (`t->size`); otherwise, an error
 is printed and `NULL` is returned. All dimension values in `new_shape` must be 
 positive integers. The `__GPU__` flag of the original tensor is preserved in 
 the newly returned tensor.
+```
+
+> Signature
+```
+TensorEngine* reshape(TensorEngine* t, int *new_shape, size_t new_ndim);
 ```
 
 > Example
@@ -718,6 +814,11 @@ tensor `t` using multidimensional slicing specifications.
 - `num_slices` specifies how many dimensions to slice (defaults to `t->ndim` when set to `0`).
 - `offset` applies an optional initial linear element offset (defaults to `0`).
 Supports both CPU and GPU execution.
+```
+
+> Signature
+```
+TensorEngine* slice(TensorEngine* t, int indices[][3], size_t num_slices = 0, int offset = 0);
 ```
 
 > Example
