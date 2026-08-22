@@ -563,9 +563,10 @@ void attach_slice_grad_fn(
 ```
 TensorEngine* x = tensor((f64[]){10.0, 20.0, 30.0, 40.0, E}, (int[]){4, N}, false);
 int s[][3] = { {1, 3, 1} };
-TensorEngine* sl = slice(x, s, 1, 0);
+TensorEngine* sl = slice(x, s, 1, 0); // slice elements at index 1 and 2
+backward(sl);
 
-print_graph(sl);
+p(x); // x->grad is [0.0, 1.0, 1.0, 0.0]
 
 free_tensor(x);
 free_tensor(sl);
@@ -578,7 +579,7 @@ int s[][3] = { {0, 2, 1}, {0, 2, 1} };
 TensorEngine* sl = slice(x, s, 2, 0);
 backward(sl);
 
-p(x); // x->grad has 1.0 at [0..2, 0..2] and 0.0 elsewhere
+p(x); // x->grad has 1.0 on top-left 2x2 block and 0.0 elsewhere
 
 free_tensor(x);
 free_tensor(sl);
@@ -587,9 +588,11 @@ free_tensor(sl);
 ## add_backward_fn
 ```
 The `add_backward_fn` is the backward callback function for element-wise addition 
-($c = a + b$). Since $\frac{\partial c}{\partial a} = 1$ and $\frac{\partial c}{\partial b} = 1$, 
-it propagates the incoming gradient `grad_output` directly to both $a$ and $b$ using 
-`accumulate_grad`.
+(c = a + b). By the sum rule of differential calculus:
+    ∂c/∂a = 1.0  =>  grad_a = grad_output
+    ∂c/∂b = 1.0  =>  grad_b = grad_output
+The incoming gradient `grad_output` is accumulated directly into the gradient 
+buffers of both input operands `a` and `b`.
 ```
 
 > Signature
@@ -629,8 +632,10 @@ free_tensor(c);
 ## sub_backward_fn
 ```
 The `sub_backward_fn` is the backward callback function for element-wise subtraction 
-($c = a - b$). Since $\frac{\partial c}{\partial a} = 1$ and $\frac{\partial c}{\partial b} = -1$, 
-it accumulates `grad_output` into $a$ and `-grad_output` into $b$.
+(c = a - b). By the difference rule of calculus:
+    ∂c/∂a =  1.0  =>  grad_a =  grad_output
+    ∂c/∂b = -1.0  =>  grad_b = -grad_output
+It accumulates `grad_output` into `a->grad` and `-grad_output` into `b->grad`.
 ```
 
 > Signature
@@ -670,9 +675,11 @@ free_tensor(c);
 ## mul_backward_fn
 ```
 The `mul_backward_fn` is the backward callback function for element-wise multiplication 
-($c = a \cdot b$). Using the product rule, $\frac{\partial c}{\partial a} = b$ and 
-$\frac{\partial c}{\partial b} = a$. It computes $\text{grad\_output} \cdot b$ and 
-accumulates it into $a$, and computes $\text{grad\_output} \cdot a$ and accumulates it into $b$.
+(c = a * b). By the product rule of calculus:
+    ∂c/∂a = b  =>  grad_a = grad_output * b
+    ∂c/∂b = a  =>  grad_b = grad_output * a
+It computes `grad_output * b` and accumulates it into `a->grad`, and computes 
+`grad_output * a` and accumulates it into `b->grad`.
 ```
 
 > Signature
@@ -701,7 +708,7 @@ TensorEngine* x = tensor((f64[]){4.0, E}, (int[]){1, N}, false);
 TensorEngine* y = mlt(x, x); // y = x^2
 backward(y);
 
-p(x); // x->grad is [8.000000] (2*x)
+p(x); // x->grad is [8.000000] (2 * x)
 
 free_tensor(x);
 free_tensor(y);
@@ -710,9 +717,11 @@ free_tensor(y);
 ## div_backward_fn
 ```
 The `div_backward_fn` is the backward callback function for element-wise division 
-($c = a / b$). Using the quotient rule, $\frac{\partial c}{\partial a} = \frac{1}{b}$ 
-and $\frac{\partial c}{\partial b} = -\frac{a}{b^2}$. It computes $\text{grad\_output} / b$ 
-for $a$, and $-\text{grad\_output} \cdot a / b^2$ for $b$.
+(c = a / b). By the quotient rule of calculus:
+    ∂c/∂a =  1 / b      =>  grad_a =  grad_output / b
+    ∂c/∂b = -a / (b^2)  =>  grad_b = -grad_output * a / (b^2)
+It computes `grad_output / b` for `a->grad`, and `-grad_output * a / (b^2)` 
+for `b->grad`.
 ```
 
 > Signature
@@ -752,10 +761,12 @@ free_tensor(c);
 
 ## add_broad_backward_fn
 ```
-The `add_broad_backward_fn` is the backward callback for broadcast addition. It 
-reduces `grad_output` via `unbroadcast_to` to match $a$'s original shape and accumulates 
-into $a$, and similarly reduces `grad_output` to match $b$'s original shape and accumulates 
-into $b$.
+The `add_broad_backward_fn` is the backward callback for broadcast addition 
+(c = a + b where a and b have broadcast-compatible shapes):
+    grad_a = unbroadcast_to(grad_output, a.shape)
+    grad_b = unbroadcast_to(grad_output, b.shape)
+Incoming gradients are sum-reduced along broadcasted singleton (size 1) and 
+prepended dimensions to restore the original operand shapes.
 ```
 
 > Signature
@@ -795,9 +806,12 @@ free_tensor(C);
 
 ## sub_broad_backward_fn
 ```
-The `sub_broad_backward_fn` is the backward callback for broadcast subtraction. It 
-reduces `grad_output` to $a$'s shape for $a$, and reduces `-grad_output` to $b$'s shape 
-for $b$.
+The `sub_broad_backward_fn` is the backward callback for broadcast subtraction 
+(c = a - b where a and b have broadcast-compatible shapes):
+    grad_a = unbroadcast_to( grad_output, a.shape)
+    grad_b = unbroadcast_to(-grad_output, b.shape)
+It reduces `grad_output` to `a`'s shape for `a->grad`, and reduces `-grad_output` 
+to `b`'s shape for `b->grad`.
 ```
 
 > Signature
@@ -835,10 +849,12 @@ free_tensor(C);
 
 ## mul_broad_backward_fn
 ```
-The `mul_broad_backward_fn` is the backward callback for broadcast multiplication. It 
-computes $\text{grad\_output} \cdot b$, unbroadcasts the product to $a$'s shape, and 
-accumulates it into $a$; and computes $\text{grad\_output} \cdot a$, unbroadcasts it to 
-$b$'s shape, and accumulates it into $b$.
+The `mul_broad_backward_fn` is the backward callback for broadcast multiplication 
+(c = a * b where a and b have broadcast-compatible shapes):
+    grad_a = unbroadcast_to(grad_output * b, a.shape)
+    grad_b = unbroadcast_to(grad_output * a, b.shape)
+It multiplies `grad_output` by the opposing operand and sum-reduces the broadcasted 
+dimensions to match each operand's original shape.
 ```
 
 > Signature
@@ -876,9 +892,11 @@ free_tensor(C);
 
 ## div_broad_backward_fn
 ```
-The `div_broad_backward_fn` is the backward callback for broadcast division. It computes 
-$\text{grad\_output} / b$ and unbroadcasts to $a$'s shape; and computes 
-$-\text{grad\_output} \cdot a / b^2$ and unbroadcasts to $b$'s shape.
+The `div_broad_backward_fn` is the backward callback for broadcast division 
+(c = a / b where a and b have broadcast-compatible shapes):
+    grad_a = unbroadcast_to( grad_output / b,          a.shape)
+    grad_b = unbroadcast_to(-grad_output * a / (b^2),  b.shape)
+It computes the quotient gradients and sum-reduces them along broadcasted dimensions.
 ```
 
 > Signature
@@ -917,11 +935,20 @@ free_tensor(C);
 
 ## dot_backward_fn
 ```
-The `dot_backward_fn` is the backward callback for dot products and matrix multiplications. 
-It supports 1D $\times$ 1D inner products, 2D $\times$ 1D matrix-vector products, 
-1D $\times$ 2D vector-matrix products, and 2D/ND matrix multiplications ($C = A @ B$). 
-For 2D matrices, $\frac{\partial L}{\partial A} = \text{grad\_output} @ B^T$ and 
-$\frac{\partial L}{\partial B} = A^T @ \text{grad\_output}$.
+The `dot_backward_fn` is the backward callback for dot products and matrix 
+multiplications:
+- For 1D inner product (c = a · b, scalar [1]):
+    grad_a = grad_output * b
+    grad_b = grad_output * a
+- For 2D matrix multiplication (C = A @ B, where A is [M, K] and B is [K, P]):
+    ∂L/∂A = grad_output @ B^T   (shape [M, K])
+    ∂L/∂B = A^T @ grad_output   (shape [K, P])
+- For 2D @ 1D matrix-vector product (y = A @ x, where A is [M, K] and x is [K]):
+    ∂L/∂A = grad_output.reshape([M, 1]) @ x.reshape([1, K])
+    ∂L/∂x = A^T @ grad_output
+- For 1D @ 2D vector-matrix product (y = x @ B, where x is [K] and B is [K, P]):
+    ∂L/∂x = grad_output @ B^T
+    ∂L/∂B = x.reshape([K, 1]) @ grad_output.reshape([1, P])
 ```
 
 > Signature
@@ -968,9 +995,11 @@ free_tensor(y);
 
 ## transpose_backward_fn
 ```
-The `transpose_backward_fn` is the backward callback for tensor transpositions. It 
-reverses the axes permutation (or inverts custom axis indices) on `grad_output` 
-and accumulates the transposed gradient back into the input tensor.
+The `transpose_backward_fn` is the backward callback for tensor transpositions 
+(y = T(x, axes)):
+    grad_x = T(grad_output, inv_axes)
+It applies the inverse permutation (or reverses dimensions for default transpose) 
+to `grad_output` and accumulates the result into `input->grad`.
 ```
 
 > Signature
@@ -1004,9 +1033,11 @@ free_tensor(col);
 
 ## reshape_backward_fn
 ```
-The `reshape_backward_fn` is the backward callback for tensor reshaping. It extracts 
-the original input shape stored in context, reshapes `grad_output` back to that shape, 
-and accumulates the result into the input tensor.
+The `reshape_backward_fn` is the backward callback for tensor reshaping 
+(y = reshape(x, new_shape)):
+    grad_x = reshape(grad_output, orig_shape)
+It restores the incoming gradient tensor back into the input tensor's original 
+multidimensional shape.
 ```
 
 > Signature
@@ -1042,10 +1073,11 @@ free_tensor(y);
 
 ## slice_backward_fn
 ```
-The `slice_backward_fn` is the backward callback for tensor slicing. It scatters 
-the elements of `grad_output` into a zero tensor matching the original tensor's 
-dimensions according to the saved slice indices (`starts`, `steps`, `out_shape`, `offset`), 
-and accumulates the un-sliced gradient into the input tensor.
+The `slice_backward_fn` is the backward callback for tensor slicing 
+(y = slice(x, indices)):
+    grad_x[starts:stops:steps] += grad_output
+It creates a zero tensor matching `x`'s original shape and scatters the sliced 
+gradient values back into their exact original coordinate positions.
 ```
 
 > Signature
