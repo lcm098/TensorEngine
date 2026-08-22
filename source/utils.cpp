@@ -49,10 +49,20 @@ size_t calculate_elements(f64 array[])
 
 void free_tensor(TensorEngine *t) {
     if (t == nullptr) return;
+    if (t->grad != nullptr) {
+        TensorEngine *g = t->grad;
+        t->grad = nullptr;
+        free_tensor(g);
+    }
+    if (t->grad_fn != nullptr) {
+        GradFn *fn = t->grad_fn;
+        t->grad_fn = nullptr;
+        free_grad_fn(fn);
+    }
     free(t->tensor);
     free(t->shape);
     free(t->strides);
-    delete t;
+    free(t);
 }
 
 TensorEngine* tensor(f64 array_[], int shape_[], bool __GPU__)
@@ -72,7 +82,7 @@ TensorEngine* tensor(f64 array_[], int shape_[], bool __GPU__)
 		return NULL;
 	}
 
-	TensorEngine *engine = (TensorEngine*)malloc(sizeof(TensorEngine));;
+	TensorEngine *engine = (TensorEngine*)malloc(sizeof(TensorEngine));
 
 	engine->size = elements;
 	engine->ndim = ndim;
@@ -81,7 +91,7 @@ TensorEngine* tensor(f64 array_[], int shape_[], bool __GPU__)
 
 	if (engine->tensor == nullptr) {
 		fprintf(stderr, "memory allocation failed for new tensor\n");
-		free(engine->tensor);
+		free(engine);
 		return NULL;
 	}
 
@@ -93,7 +103,8 @@ TensorEngine* tensor(f64 array_[], int shape_[], bool __GPU__)
 
 	if (engine->shape == nullptr) {
 		fprintf(stderr, "memory allocation failed for tensor shape\n");
-		free(engine->shape);
+		free(engine->tensor);
+		free(engine);
 		return NULL;
 	}
 
@@ -110,6 +121,7 @@ TensorEngine* tensor(f64 array_[], int shape_[], bool __GPU__)
 		fprintf(stderr, "memory allocation failed for tensor strides\n");
 		free(engine->shape);
 		free(engine->tensor);
+		free(engine);
 		return NULL;
 	}
 
@@ -118,6 +130,12 @@ TensorEngine* tensor(f64 array_[], int shape_[], bool __GPU__)
 	} else {
 		engine->__GPU__ = false;
 	}
+
+	engine->grad = nullptr;
+	engine->requires_grad = true;
+	engine->is_leaf = true;
+	engine->grad_fn = nullptr;
+	memset(&engine->gradfn, 0, sizeof(GradFn));
 
 	return engine;
 }
@@ -201,6 +219,17 @@ void p(TensorEngine* tensor) {
 	printf("]\n");
 	const char *status = tensor->__GPU__ ? "true":"false";
 	printf("__gpu__ [%s]\n", status);
+	if (tensor->requires_grad) {
+		printf("requires_grad: true\n");
+	}
+	if (tensor->grad_fn != nullptr && tensor->grad_fn->name != nullptr) {
+		printf("grad_fn: <%s>\n", tensor->grad_fn->name);
+	}
+	if (tensor->grad != nullptr && tensor->grad->tensor != nullptr) {
+		printf("grad = ");
+		print_recursive(tensor->grad->tensor, tensor->grad->shape, tensor->grad->strides, tensor->grad->ndim, 0, 0);
+		printf("\n");
+	}
 	printf("======================================\n");
 
 }

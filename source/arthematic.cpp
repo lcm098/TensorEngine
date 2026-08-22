@@ -1,5 +1,6 @@
 // src/arthematic.cpp
 #include "../include/arthematic.hpp"
+#include "../include/gradfn.hpp"
 #include "../__cuda__/include/kernel.cuh"
 #include <cmath>
 
@@ -44,6 +45,7 @@ TensorEngine* add(TensorEngine* t1, TensorEngine* t2)
         return NULL;
     }
 
+    TensorEngine *result = nullptr;
     if (t1->__GPU__ && t2->__GPU__)
     {
         f64 *h_cd = (double*) malloc((t1->size + 1) * sizeof(double));
@@ -68,12 +70,10 @@ TensorEngine* add(TensorEngine* t1, TensorEngine* t2)
 
         shape_terminated[t1->ndim] = N;
 
-        TensorEngine *result = tensor(h_cd, shape_terminated, true);
+        result = tensor(h_cd, shape_terminated, true);
 
         free(shape_terminated);
         free(h_cd);
-
-        return result;
     }
     else
     {
@@ -101,13 +101,14 @@ TensorEngine* add(TensorEngine* t1, TensorEngine* t2)
 
         shape_terminated[t1->ndim] = N;
 
-        TensorEngine *result = tensor(result_array, shape_terminated, false);
+        result = tensor(result_array, shape_terminated, false);
 
         free(result_array);
         free(shape_terminated);
-
-        return result;
     }
+
+    attach_binary_grad_fn(result, t1, t2, "AddBackward", OP_ADD, add_backward_fn);
+    return result;
 }
 
 
@@ -120,6 +121,7 @@ TensorEngine* sub(TensorEngine* t1, TensorEngine* t2)
         return NULL;
     }
 
+    TensorEngine *result = nullptr;
     if (t1->__GPU__ && t2->__GPU__)
     {
         f64 *h_cd = (double*) malloc((t1->size + 1) * sizeof(double));
@@ -144,12 +146,10 @@ TensorEngine* sub(TensorEngine* t1, TensorEngine* t2)
 
         shape_terminated[t1->ndim] = N;
 
-        TensorEngine *result = tensor(h_cd, shape_terminated, true);
+        result = tensor(h_cd, shape_terminated, true);
 
         free(shape_terminated);
         free(h_cd);
-
-        return result;
     }
     else
     {
@@ -177,13 +177,14 @@ TensorEngine* sub(TensorEngine* t1, TensorEngine* t2)
 
         shape_terminated[t1->ndim] = N;
 
-        TensorEngine *result = tensor(result_array, shape_terminated, false);
+        result = tensor(result_array, shape_terminated, false);
 
         free(result_array);
         free(shape_terminated);
-
-        return result;
     }
+
+    attach_binary_grad_fn(result, t1, t2, "SubBackward", OP_SUB, sub_backward_fn);
+    return result;
 }
 
 
@@ -196,6 +197,7 @@ TensorEngine* mlt(TensorEngine* t1, TensorEngine* t2)
         return NULL;
     }
 
+    TensorEngine *result = nullptr;
     if (t1->__GPU__ && t2->__GPU__)
     {
         f64 *h_cd = (double*) malloc((t1->size + 1) * sizeof(double));
@@ -220,12 +222,10 @@ TensorEngine* mlt(TensorEngine* t1, TensorEngine* t2)
 
         shape_terminated[t1->ndim] = N;
 
-        TensorEngine *result = tensor(h_cd, shape_terminated, true);
+        result = tensor(h_cd, shape_terminated, true);
 
         free(shape_terminated);
         free(h_cd);
-
-        return result;
     }
     else
     {
@@ -253,13 +253,14 @@ TensorEngine* mlt(TensorEngine* t1, TensorEngine* t2)
 
         shape_terminated[t1->ndim] = N;
 
-        TensorEngine *result = tensor(result_array, shape_terminated, false);
+        result = tensor(result_array, shape_terminated, false);
 
         free(result_array);
         free(shape_terminated);
-
-        return result;
     }
+
+    attach_binary_grad_fn(result, t1, t2, "MulBackward", OP_MUL, mul_backward_fn);
+    return result;
 }
 
 
@@ -271,6 +272,7 @@ TensorEngine* divt(TensorEngine* t1, TensorEngine* t2)
         return NULL;
     }
 
+    TensorEngine *result = nullptr;
     if (t1->__GPU__ && t2->__GPU__)
     {
         f64 *h_cd = (double*) malloc((t1->size + 1) * sizeof(double));
@@ -295,12 +297,10 @@ TensorEngine* divt(TensorEngine* t1, TensorEngine* t2)
 
         shape_terminated[t1->ndim] = N;
 
-        TensorEngine *result = tensor(h_cd, shape_terminated, true);
+        result = tensor(h_cd, shape_terminated, true);
 
         free(shape_terminated);
         free(h_cd);
-
-        return result;
     }
     else
     {
@@ -331,13 +331,14 @@ TensorEngine* divt(TensorEngine* t1, TensorEngine* t2)
 
         shape_terminated[t1->ndim] = N;
 
-        TensorEngine *result = tensor(result_array, shape_terminated, false);
+        result = tensor(result_array, shape_terminated, false);
 
         free(result_array);
         free(shape_terminated);
-
-        return result;
     }
+
+    attach_binary_grad_fn(result, t1, t2, "DivBackward", OP_DIV, div_backward_fn);
+    return result;
 }
 
 
@@ -383,6 +384,7 @@ TensorEngine* mod(TensorEngine* t1, TensorEngine* t2)
     free(result_array);
     free(shape_terminated);
 
+    attach_binary_grad_fn(result, t1, t2, "ModBackward", OP_MOD, nullptr);
     return result;
 }
 
@@ -511,6 +513,7 @@ TensorEngine* add_broad(TensorEngine* t1, TensorEngine* t2) {
     result_array[out_size] = E;
     TensorEngine *result = tensor(result_array, shape_terminated, t1->__GPU__ && t2->__GPU__);
     free(result_array); free(out_shape); free(shape_terminated);
+    attach_binary_grad_fn(result, t1, t2, "AddBroadBackward", OP_ADD_BROAD, add_broad_backward_fn);
     return result;
 }
 
@@ -541,6 +544,7 @@ TensorEngine* sub_broad(TensorEngine* t1, TensorEngine* t2) {
     result_array[out_size] = E;
     TensorEngine *result = tensor(result_array, shape_terminated, t1->__GPU__ && t2->__GPU__);
     free(result_array); free(out_shape); free(shape_terminated);
+    attach_binary_grad_fn(result, t1, t2, "SubBroadBackward", OP_SUB_BROAD, sub_broad_backward_fn);
     return result;
 }
 
@@ -571,6 +575,7 @@ TensorEngine* mlt_broad(TensorEngine* t1, TensorEngine* t2) {
     result_array[out_size] = E;
     TensorEngine *result = tensor(result_array, shape_terminated, t1->__GPU__ && t2->__GPU__);
     free(result_array); free(out_shape); free(shape_terminated);
+    attach_binary_grad_fn(result, t1, t2, "MulBroadBackward", OP_MUL_BROAD, mul_broad_backward_fn);
     return result;
 }
 
@@ -601,6 +606,7 @@ TensorEngine* div_broad(TensorEngine* t1, TensorEngine* t2) {
     result_array[out_size] = E;
     TensorEngine *result = tensor(result_array, shape_terminated, t1->__GPU__ && t2->__GPU__);
     free(result_array); free(out_shape); free(shape_terminated);
+    attach_binary_grad_fn(result, t1, t2, "DivBroadBackward", OP_DIV_BROAD, div_broad_backward_fn);
     return result;
 }
 
@@ -631,6 +637,7 @@ TensorEngine* mod_broad(TensorEngine* t1, TensorEngine* t2) {
     result_array[out_size] = E;
     TensorEngine *result = tensor(result_array, shape_terminated, t1->__GPU__ && t2->__GPU__);
     free(result_array); free(out_shape); free(shape_terminated);
+    attach_binary_grad_fn(result, t1, t2, "ModBroadBackward", OP_MOD_BROAD, nullptr);
     return result;
 }
 
@@ -780,5 +787,6 @@ TensorEngine* dot_prod(TensorEngine* t1, TensorEngine* t2) {
     TensorEngine *result = tensor(result_array, shape_terminated, use_gpu);
     free(result_array);
     free(shape_terminated);
+    attach_binary_grad_fn(result, t1, t2, "DotBackward", OP_DOT, dot_backward_fn);
     return result;
 }

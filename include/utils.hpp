@@ -6,10 +6,7 @@ extern "C" {
 #endif
 
 #include "common.hpp"
-
-typedef struct GradFn {
-} GradFn;
-
+#include "gradfn.hpp"
 
 typedef struct TensorEngine {
 
@@ -19,6 +16,10 @@ typedef struct TensorEngine {
 	int *shape;
 	int *strides;
 	bool __GPU__;
+	struct TensorEngine *grad;
+	bool requires_grad;
+	bool is_leaf;
+	GradFn *grad_fn;
 	GradFn gradfn;
 
 } TensorEngine;

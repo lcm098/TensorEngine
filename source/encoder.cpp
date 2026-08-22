@@ -44,5 +44,10 @@ TensorEngine* _encode_image_as_tensor(uint8_t *image_array, size_t H, size_t W, 
     t1->size = total;
     t1->strides = calculate_strides(t1->shape, t1->ndim);
     t1->__GPU__ = __GPU_;
+    t1->grad = nullptr;
+    t1->requires_grad = true;
+    t1->is_leaf = true;
+    t1->grad_fn = nullptr;
+    memset(&t1->gradfn, 0, sizeof(GradFn));
     return t1;
 }

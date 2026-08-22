@@ -8,6 +8,7 @@
 #include "./utility.hpp"
 #include "./tensor_factory.hpp"
 #include "./encoder.hpp"
+#include "./gradfn.hpp"
 
 #endif
 

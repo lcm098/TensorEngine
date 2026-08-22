@@ -1,4 +1,5 @@
 #include "../include/utility.hpp"
+#include "../include/gradfn.hpp"
 #include <cstdio>
 #include <cstdlib>
 
@@ -62,6 +63,7 @@ TensorEngine* T(TensorEngine * t, int *axes) {
         TensorEngine *result = tensor(result_array, shape_terminated, t->__GPU__);
         free(result_array);
         free(shape_terminated);
+        attach_transpose_grad_fn(result, t, nullptr);
         return result;
     }
 
@@ -163,6 +165,7 @@ TensorEngine* T(TensorEngine * t, int *axes) {
 
     result_array[t->size] = E;
     TensorEngine *result = tensor(result_array, shape_terminated, t->__GPU__);
+    attach_transpose_grad_fn(result, t, effective_axes);
     free(effective_axes);
     free(result_array);
     free(shape_terminated);
@@ -260,6 +263,7 @@ TensorEngine* reshape(TensorEngine* t, int *new_shape, size_t new_ndim) {
     free(host_data);
     free(shape_terminated);
 
+    attach_reshape_grad_fn(result, t, t->shape, t->ndim);
     return result;
 }
 
@@ -469,6 +473,8 @@ TensorEngine* slice(TensorEngine* t, int indices[][3], size_t num_slices, int of
     result_array[out_size] = E;
 
     TensorEngine *result = tensor(result_array, shape_terminated, t->__GPU__);
+
+    attach_slice_grad_fn(result, t, starts, steps, shape_terminated, offset);
 
     free(starts);
     free(steps);
