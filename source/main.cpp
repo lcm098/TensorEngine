@@ -40,7 +40,7 @@ int main()
         {0, 2, 1}, // Rows: [0, 2] step 1
         {1, 4, 2}  // Cols: [1, 4] step 2
     };
-    TensorEngine* sub_mat = slice(mat, s, 2);
+    TensorEngine* sub_mat = slice(mat, s, 2, 0);
 
     p(mat);
     p(sub_mat);

@@ -818,20 +818,21 @@ Supports both CPU and GPU execution.
 
 > Signature
 ```
-TensorEngine* slice(TensorEngine* t, int indices[][3], size_t num_slices = 0, int offset = 0);
+TensorEngine* slice(TensorEngine* t, int indices[][3], size_t num_slices, int offset);
 ```
 
 > Example
 ```
 TensorEngine* t = arange(1.0, 13.0, 1.0, false);
 int shape[] = {3, 4};
-TensorEngine* mat = reshape(t, shape, 2);
+TensorEngine* mat = reshape(t, shape, 2, 0);
 
 int s[][3] = {
-    {0, 2, 1}, // Rows: [0, 2) step 1
-    {1, 4, 2}  // Cols: [1, 4) step 2
+    {0, 2, 1}, // Rows: [0, 2] step 1
+    {1, 4, 2}  // Cols: [1, 4] step 2
 };
-TensorEngine* sub_mat = slice(mat, s, 2);
+TensorEngine* sub_mat = slice(mat, s, 2, 0);
+// 0 is offset, you have to always pass offset as 0
 p(sub_mat);
 
 free_tensor(t);
