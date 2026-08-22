@@ -3,7 +3,7 @@
 ## tensor
 ```
 The `tensor` function is a primary function. You can use it to create a tensor
-of any shape on either the CPU or the GPU. Note that you cannot simply pass 
+of any shape on either the CPU or the GPU. Note that you can simply pass 
 the raw array and shape array directly; there are specific rules to follow. 
 First, you must create a linear array of the `f64` data type (representing a 
 double-precision float) and a separate shape array; ensure that the product of 
