@@ -87,8 +87,18 @@ void runMatMulOp(const double *h_A, const double *h_B, double *h_C,
                   int M, int K, int cols);
 
 
-void runTransposeDoubleOp(const double *in_dev, double *h_out, size_t rows, size_t cols);
+void runTransposeDoubleOp(const double *h_in, double *h_out, size_t rows, size_t cols);
 __global__ void transposeKernelD(const double *in, double *out, size_t rows, size_t cols);
 
+void runTransposeNDDoubleOp(
+    const double *h_in, double *h_out,
+    const int *h_in_shape, const size_t *h_in_strides,
+    const int *h_out_shape, const int *h_axes,
+    size_t ndim, size_t total_size);
+__global__ void transposeNDKernelD(
+    const double *in, double *out,
+    const int *in_shape, const size_t *in_strides,
+    const int *out_shape, const int *axes,
+    size_t ndim, size_t total_size);
 
 #endif

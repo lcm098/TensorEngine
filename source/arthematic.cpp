@@ -642,120 +642,140 @@ TensorEngine* dot_prod(TensorEngine* t1, TensorEngine* t2) {
 
     bool use_gpu = t1->__GPU__ && t2->__GPU__;
 
-    // ------------------------------------------------------------------
-    // Determine M, inner (K), cols and output shape from ndim combination
-    // ------------------------------------------------------------------
-    int rows_out = 0, inner = 0, cols_out = 0;
-    int out_ndim = 0;
+    size_t ndim1 = t1->ndim;
+    size_t ndim2 = t2->ndim;
 
-    if (t1->ndim == 1 && t2->ndim == 1) {
-        // vector · vector → scalar returned as shape [1]
-        if (t1->size != t2->size) {
-            fprintf(stderr, "dot_prod: 1D size mismatch (%zu vs %zu)\n",
-                    t1->size, t2->size);
-            return NULL;
-        }
-        rows_out = 1;
-        inner    = (int)t1->size;
-        cols_out = 1;
-        out_ndim = 1;   // result shape [1]
-    }
-    else if (t1->ndim == 2 && t2->ndim == 2) {
-        // matrix × matrix
-        if (t1->shape[1] != t2->shape[0]) {
-            fprintf(stderr, "dot_prod: shape mismatch [%d,%d] × [%d,%d]\n",
-                    t1->shape[0], t1->shape[1], t2->shape[0], t2->shape[1]);
-            return NULL;
-        }
-        rows_out = t1->shape[0];
-        inner    = t1->shape[1];
-        cols_out = t2->shape[1];
-        out_ndim = 2;
-    }
-    else if (t1->ndim == 1 && t2->ndim == 2) {
-        // vector × matrix  [K] × [K, cols] → [cols]
-        if ((int)t1->size != t2->shape[0]) {
-            fprintf(stderr, "dot_prod: 1D×2D shape mismatch (%zu vs %d)\n",
-                    t1->size, t2->shape[0]);
-            return NULL;
-        }
-        rows_out = 1;
-        inner    = (int)t1->size;
-        cols_out = t2->shape[1];
-        out_ndim = 1;   // result shape [cols]
-    }
-    else if (t1->ndim == 2 && t2->ndim == 1) {
-        // matrix × vector  [M, K] × [K] → [M]
-        if (t1->shape[1] != (int)t2->size) {
-            fprintf(stderr, "dot_prod: 2D×1D shape mismatch (%d vs %zu)\n",
-                    t1->shape[1], t2->size);
-            return NULL;
-        }
-        rows_out = t1->shape[0];
-        inner    = t1->shape[1];
-        cols_out = 1;
-        out_ndim = 1;   // result shape [M]
-    }
-    else {
-        fprintf(stderr, "dot_prod: unsupported ndim combination (%zu, %zu); "
-                        "only 1D/2D tensors are supported\n",
-                t1->ndim, t2->ndim);
+    // ------------------------------------------------------------------
+    // Determine contracted axis length (K)
+    // ------------------------------------------------------------------
+    int K1 = t1->shape[ndim1 - 1];
+    int K2 = (ndim2 == 1) ? t2->shape[0] : t2->shape[ndim2 - 2];
+
+    if (K1 != K2) {
+        fprintf(stderr, "dot_prod: inner dimension mismatch (%d vs %d)\n", K1, K2);
         return NULL;
     }
 
-    size_t out_size = (size_t)rows_out * cols_out;
+    int K = K1;
+
+    // ------------------------------------------------------------------
+    // Compute output shape and dimensions
+    // ------------------------------------------------------------------
+    size_t out_ndim = 0;
+    if (ndim1 == 1 && ndim2 == 1) {
+        out_ndim = 1;
+    } else if (ndim1 >= 2 && ndim2 == 1) {
+        out_ndim = ndim1 - 1;
+    } else if (ndim1 == 1 && ndim2 >= 2) {
+        out_ndim = ndim2 - 1;
+    } else {
+        out_ndim = (ndim1 - 1) + (ndim2 - 1);
+    }
+
+    int *shape_terminated = (int*) malloc(sizeof(int) * (out_ndim + 1));
+    if (!shape_terminated) {
+        fprintf(stderr, "dot_prod: malloc failed for shape\n");
+        return NULL;
+    }
+
+    if (ndim1 == 1 && ndim2 == 1) {
+        shape_terminated[0] = 1;
+    } else if (ndim1 >= 2 && ndim2 == 1) {
+        for (size_t i = 0; i < ndim1 - 1; i++) {
+            shape_terminated[i] = t1->shape[i];
+        }
+    } else if (ndim1 == 1 && ndim2 >= 2) {
+        for (size_t j = 0; j < ndim2 - 2; j++) {
+            shape_terminated[j] = t2->shape[j];
+        }
+        shape_terminated[ndim2 - 2] = t2->shape[ndim2 - 1];
+    } else {
+        size_t cur = 0;
+        for (size_t i = 0; i < ndim1 - 1; i++) {
+            shape_terminated[cur++] = t1->shape[i];
+        }
+        for (size_t j = 0; j < ndim2 - 2; j++) {
+            shape_terminated[cur++] = t2->shape[j];
+        }
+        shape_terminated[cur++] = t2->shape[ndim2 - 1];
+    }
+    shape_terminated[out_ndim] = N;
+
+    // ------------------------------------------------------------------
+    // Compute sizes: M_total, P_total, cols, out_size
+    // ------------------------------------------------------------------
+    size_t M_total = 1;
+    if (ndim1 >= 2) {
+        for (size_t i = 0; i < ndim1 - 1; i++) {
+            M_total *= (size_t)t1->shape[i];
+        }
+    }
+
+    size_t P_total = 1;
+    if (ndim2 >= 3) {
+        for (size_t j = 0; j < ndim2 - 2; j++) {
+            P_total *= (size_t)t2->shape[j];
+        }
+    }
+
+    int cols = (ndim2 == 1) ? 1 : t2->shape[ndim2 - 1];
+    size_t out_size = M_total * P_total * (size_t)cols;
 
     // ------------------------------------------------------------------
     // Allocate result buffer (+1 for E sentinel)
     // ------------------------------------------------------------------
     f64 *result_array = (f64*) malloc(sizeof(f64) * (out_size + 1));
     if (!result_array) {
+        free(shape_terminated);
         fprintf(stderr, "dot_prod: malloc failed for result\n");
         return NULL;
     }
 
     // ------------------------------------------------------------------
-    // Compute
+    // Compute: GPU vs CPU
     // ------------------------------------------------------------------
     if (use_gpu) {
-        runMatMulOp(t1->tensor, t2->tensor, result_array,
-                    rows_out, inner, cols_out);
+        size_t N_cols_out = P_total * (size_t)cols;
+        if (P_total == 1) {
+            runMatMulOp(t1->tensor, t2->tensor, result_array,
+                        (int)M_total, K, (int)N_cols_out);
+        } else {
+            f64 *t2_reordered = (f64*) malloc(sizeof(f64) * t2->size);
+            if (!t2_reordered) {
+                free(result_array);
+                free(shape_terminated);
+                fprintf(stderr, "dot_prod: malloc failed for t2_reordered\n");
+                return NULL;
+            }
+            for (size_t k = 0; k < (size_t)K; k++) {
+                for (size_t p = 0; p < P_total; p++) {
+                    for (size_t c = 0; c < (size_t)cols; c++) {
+                        t2_reordered[k * N_cols_out + (p * (size_t)cols + c)] =
+                            t2->tensor[p * ((size_t)K * (size_t)cols) + k * (size_t)cols + c];
+                    }
+                }
+            }
+            runMatMulOp(t1->tensor, t2_reordered, result_array,
+                        (int)M_total, K, (int)N_cols_out);
+            free(t2_reordered);
+        }
     } else {
-        for (int r = 0; r < rows_out; r++) {
-            for (int c = 0; c < cols_out; c++) {
-                double acc = 0.0;
-                for (int k = 0; k < inner; k++)
-                    acc += t1->tensor[r * inner + k] * t2->tensor[k * cols_out + c];
-                result_array[r * cols_out + c] = acc;
+        for (size_t m = 0; m < M_total; m++) {
+            for (size_t p = 0; p < P_total; p++) {
+                for (size_t c = 0; c < (size_t)cols; c++) {
+                    double acc = 0.0;
+                    size_t t1_base = m * (size_t)K;
+                    size_t t2_base = p * ((size_t)K * (size_t)cols) + c;
+                    for (size_t k = 0; k < (size_t)K; k++) {
+                        acc += t1->tensor[t1_base + k] * t2->tensor[t2_base + k * (size_t)cols];
+                    }
+                    result_array[(m * P_total + p) * (size_t)cols + c] = acc;
+                }
             }
         }
     }
+
     result_array[out_size] = E;
-
-    // ------------------------------------------------------------------
-    // Build shape array (sentinel-terminated)
-    // ------------------------------------------------------------------
-    // out_ndim is 1 or 2; shape values depend on the case
-    int *shape_terminated = (int*) malloc(sizeof(int) * (out_ndim + 1));
-    if (!shape_terminated) {
-        free(result_array);
-        fprintf(stderr, "dot_prod: malloc failed for shape\n");
-        return NULL;
-    }
-
-    if (out_ndim == 1) {
-        // 1D×1D → [1], 1D×2D → [cols], 2D×1D → [rows]
-        if (t1->ndim == 1 && t2->ndim == 1)
-            shape_terminated[0] = 1;
-        else if (t1->ndim == 1 && t2->ndim == 2)
-            shape_terminated[0] = cols_out;
-        else  // 2D×1D
-            shape_terminated[0] = rows_out;
-    } else {
-        shape_terminated[0] = rows_out;
-        shape_terminated[1] = cols_out;
-    }
-    shape_terminated[out_ndim] = N;
 
     TensorEngine *result = tensor(result_array, shape_terminated, use_gpu);
     free(result_array);

@@ -283,19 +283,85 @@ __global__ void transposeKernelD(const double *in, double *out, size_t rows, siz
     out[j * rows + i] = in[i * cols + j];
 }
 
-void runTransposeDoubleOp(const double *in_dev, double *h_out, size_t rows, size_t cols) {
+void runTransposeDoubleOp(const double *h_in, double *h_out, size_t rows, size_t cols) {
     size_t total = rows * cols;
 
-    double *d_out;
-    cudaMalloc(&d_out, sizeof(double) * total);
+    double *d_in, *d_out;
+    CUDA_CHECK(cudaMalloc(&d_in, sizeof(double) * total));
+    CUDA_CHECK(cudaMalloc(&d_out, sizeof(double) * total));
+
+    CUDA_CHECK(cudaMemcpy(d_in, h_in, sizeof(double) * total, cudaMemcpyHostToDevice));
 
     int threads = 256;
     int blocks = (int)((total + threads - 1) / threads);
 
-    transposeKernelD<<<blocks, threads>>>(in_dev, d_out, rows, cols);
+    transposeKernelD<<<blocks, threads>>>(d_in, d_out, rows, cols);
 
-    cudaDeviceSynchronize();
-    cudaMemcpy(h_out, d_out, sizeof(double) * total, cudaMemcpyDeviceToHost);
+    CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaDeviceSynchronize());
+    CUDA_CHECK(cudaMemcpy(h_out, d_out, sizeof(double) * total, cudaMemcpyDeviceToHost));
 
+    cudaFree(d_in);
     cudaFree(d_out);
+}
+
+__global__ void transposeNDKernelD(
+    const double *in, double *out,
+    const int *in_shape, const size_t *in_strides,
+    const int *out_shape, const int *axes,
+    size_t ndim, size_t total_size)
+{
+    size_t linear = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
+    if (linear >= total_size) return;
+
+    size_t rem = linear;
+    size_t in_offset = 0;
+
+    for (size_t d = ndim; d-- > 0; ) {
+        size_t coord = rem % (size_t)out_shape[d];
+        rem /= (size_t)out_shape[d];
+        in_offset += coord * in_strides[axes[d]];
+    }
+
+    out[linear] = in[in_offset];
+}
+
+void runTransposeNDDoubleOp(
+    const double *h_in, double *h_out,
+    const int *h_in_shape, const size_t *h_in_strides,
+    const int *h_out_shape, const int *h_axes,
+    size_t ndim, size_t total_size)
+{
+    double *d_in, *d_out;
+    int *d_in_shape, *d_out_shape, *d_axes;
+    size_t *d_in_strides;
+
+    CUDA_CHECK(cudaMalloc(&d_in, sizeof(double) * total_size));
+    CUDA_CHECK(cudaMalloc(&d_out, sizeof(double) * total_size));
+    CUDA_CHECK(cudaMalloc(&d_in_shape, sizeof(int) * ndim));
+    CUDA_CHECK(cudaMalloc(&d_out_shape, sizeof(int) * ndim));
+    CUDA_CHECK(cudaMalloc(&d_axes, sizeof(int) * ndim));
+    CUDA_CHECK(cudaMalloc(&d_in_strides, sizeof(size_t) * ndim));
+
+    CUDA_CHECK(cudaMemcpy(d_in, h_in, sizeof(double) * total_size, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_in_shape, h_in_shape, sizeof(int) * ndim, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_out_shape, h_out_shape, sizeof(int) * ndim, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_axes, h_axes, sizeof(int) * ndim, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_in_strides, h_in_strides, sizeof(size_t) * ndim, cudaMemcpyHostToDevice));
+
+    int threads = 256;
+    int blocks = (int)((total_size + threads - 1) / threads);
+
+    transposeNDKernelD<<<blocks, threads>>>(d_in, d_out, d_in_shape, d_in_strides, d_out_shape, d_axes, ndim, total_size);
+
+    CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaDeviceSynchronize());
+    CUDA_CHECK(cudaMemcpy(h_out, d_out, sizeof(double) * total_size, cudaMemcpyDeviceToHost));
+
+    cudaFree(d_in);
+    cudaFree(d_out);
+    cudaFree(d_in_shape);
+    cudaFree(d_out_shape);
+    cudaFree(d_axes);
+    cudaFree(d_in_strides);
 }
