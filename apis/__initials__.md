@@ -715,6 +715,8 @@ as-is; only leading `1`-sized dimensions are dropped.
   order, the underlying data is copied unchanged; only the shape metadata 
   is rebuilt.
 Supports both CPU and GPU execution.
+
+extract method is frequently used after the slice method
 ```
  
 > Signature
