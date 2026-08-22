@@ -369,3 +369,713 @@ p(unb); // Shape [3], values [5.000000, 7.000000, 9.000000]
 free_tensor(grad);
 free_tensor(unb);
 ```
+
+## attach_binary_grad_fn
+```
+The `attach_binary_grad_fn` helper attaches a two-input binary backward node (`GradFn`) 
+to a result tensor resulting from operations like `add`, `sub`, `mlt`, `divt`, `dot_prod`, 
+or broadcast variants. It saves references to the two input operands `t1` and `t2`, sets 
+`result->requires_grad = true`, sets `result->is_leaf = false`, and associates the 
+specified backward callback function pointer `apply`.
+```
+
+> Signature
+```
+void attach_binary_grad_fn(
+    TensorEngine *result,
+    TensorEngine *t1,
+    TensorEngine *t2,
+    const char *name,
+    GradFnType type,
+    void (*apply)(GradFn *self, TensorEngine *grad_output)
+);
+```
+
+> Example
+```
+TensorEngine* t1 = tensor((f64[]){1.0, E}, (int[]){1, N}, false);
+TensorEngine* t2 = tensor((f64[]){2.0, E}, (int[]){1, N}, false);
+TensorEngine* res = tensor((f64[]){3.0, E}, (int[]){1, N}, false);
+
+attach_binary_grad_fn(res, t1, t2, "AddBackward", OP_ADD, add_backward_fn);
+
+print_graph(res);
+
+free_tensor(t1);
+free_tensor(t2);
+free_tensor(res);
+```
+
+> Second Example
+```
+TensorEngine* a = ones((int[]){2, 2, N}, false);
+TensorEngine* b = ones((int[]){2, 2, N}, false);
+TensorEngine* c = ones((int[]){2, 2, N}, false);
+
+attach_binary_grad_fn(c, a, b, "MulBackward", OP_MUL, mul_backward_fn);
+
+free_tensor(a);
+free_tensor(b);
+free_tensor(c);
+```
+
+## attach_unary_grad_fn
+```
+The `attach_unary_grad_fn` helper attaches a single-input backward node (`GradFn`) 
+to a result tensor resulting from unary operations (such as `transpose`, `reshape`, 
+`slice`). It saves a reference to `input`, sets `result->requires_grad = true` and 
+`result->is_leaf = false`, and attaches custom operation context along with its 
+cleanup callback `release_context`.
+```
+
+> Signature
+```
+void attach_unary_grad_fn(
+    TensorEngine *result,
+    TensorEngine *input,
+    const char *name,
+    GradFnType type,
+    void (*apply)(GradFn *self, TensorEngine *grad_output),
+    void *context,
+    void (*release_context)(void *ctx)
+);
+```
+
+> Example
+```
+TensorEngine* input = ones((int[]){2, 3, N}, false);
+TensorEngine* res = ones((int[]){3, 2, N}, false);
+
+attach_unary_grad_fn(res, input, "TransposeBackward", OP_TRANSPOSE, transpose_backward_fn, nullptr, nullptr);
+
+free_tensor(input);
+free_tensor(res);
+```
+
+> Second Example
+```
+TensorEngine* input = ones((int[]){6, N}, false);
+TensorEngine* res = ones((int[]){2, 3, N}, false);
+
+attach_unary_grad_fn(res, input, "ReshapeBackward", OP_RESHAPE, reshape_backward_fn, nullptr, nullptr);
+
+free_tensor(input);
+free_tensor(res);
+```
+
+## attach_transpose_grad_fn
+```
+The `attach_transpose_grad_fn` helper constructs and attaches a `TransposeBackward` 
+graph node to a transposed result tensor. It packages the original tensor's dimension 
+count and the permutation axes array into a dedicated context struct so that during 
+the backward pass, the gradient can be inverted back to the input tensor's layout.
+```
+
+> Signature
+```
+void attach_transpose_grad_fn(TensorEngine *result, TensorEngine *input, const int *axes);
+```
+
+> Example
+```
+TensorEngine* t = tensor((f64[]){1.0, 2.0, 3.0, 4.0, E}, (int[]){2, 2, N}, false);
+TensorEngine* res = T(t);
+
+// attach_transpose_grad_fn is automatically invoked inside T() / transpose()
+p(res);
+
+free_tensor(t);
+free_tensor(res);
+```
+
+> Second Example
+```
+TensorEngine* t = arange(1.0, 25.0, 1.0, false);
+int sh[] = {2, 3, 4};
+TensorEngine* t3d = reshape(t, sh, 3);
+int axes[] = {2, 0, 1};
+
+TensorEngine* transposed = T(t3d, axes);
+
+free_tensor(t);
+free_tensor(t3d);
+free_tensor(transposed);
+```
+
+## attach_reshape_grad_fn
+```
+The `attach_reshape_grad_fn` helper packages the original shape and dimensionality 
+of `input` into a reshape context and attaches a `ReshapeBackward` node to `result`. 
+During `backward`, the incoming gradient is reshaped back to match `input`'s original shape.
+```
+
+> Signature
+```
+void attach_reshape_grad_fn(TensorEngine *result, TensorEngine *input, const int *orig_shape, size_t orig_ndim);
+```
+
+> Example
+```
+TensorEngine* t = arange(1.0, 7.0, 1.0, false);
+int sh[] = {2, 3};
+TensorEngine* reshaped = reshape(t, sh, 2);
+
+print_graph(reshaped);
+
+free_tensor(t);
+free_tensor(reshaped);
+```
+
+> Second Example
+```
+TensorEngine* t = ones((int[]){2, 2, 2, N}, false);
+int sh[] = {8};
+TensorEngine* flat = reshape(t, sh, 1);
+
+backward(flat);
+p(t); // t->grad is restored in [2, 2, 2] shape
+
+free_tensor(t);
+free_tensor(flat);
+```
+
+## attach_slice_grad_fn
+```
+The `attach_slice_grad_fn` helper packages slicing coordinates (`starts`, `steps`, 
+`out_shape`, `offset`) and original tensor shape into a slice context, and attaches 
+a `SliceBackward` node to `result`. During backpropagation, the sliced gradient values 
+are scattered back into their exact coordinate positions in a zero tensor matching `input`.
+```
+
+> Signature
+```
+void attach_slice_grad_fn(
+    TensorEngine *result,
+    TensorEngine *input,
+    const int *starts,
+    const int *steps,
+    const int *out_shape,
+    int offset
+);
+```
+
+> Example
+```
+TensorEngine* x = tensor((f64[]){10.0, 20.0, 30.0, 40.0, E}, (int[]){4, N}, false);
+int s[][3] = { {1, 3, 1} };
+TensorEngine* sl = slice(x, s, 1, 0); // slice elements at index 1 and 2
+backward(sl);
+
+p(x); // x->grad is [0.0, 1.0, 1.0, 0.0]
+
+free_tensor(x);
+free_tensor(sl);
+```
+
+> Second Example
+```
+TensorEngine* x = ones((int[]){4, 4, N}, false);
+int s[][3] = { {0, 2, 1}, {0, 2, 1} };
+TensorEngine* sl = slice(x, s, 2, 0);
+backward(sl);
+
+p(x); // x->grad has 1.0 on top-left 2x2 block and 0.0 elsewhere
+
+free_tensor(x);
+free_tensor(sl);
+```
+
+## add_backward_fn
+```
+The `add_backward_fn` is the backward callback function for element-wise addition 
+($c = a + b$). Since $\frac{\partial c}{\partial a} = 1$ and $\frac{\partial c}{\partial b} = 1$, 
+it propagates the incoming gradient `grad_output` directly to both $a$ and $b$ using 
+`accumulate_grad`.
+```
+
+> Signature
+```
+void add_backward_fn(GradFn *self, TensorEngine *grad_output);
+```
+
+> Example
+```
+TensorEngine* a = tensor((f64[]){2.0, E}, (int[]){1, N}, false);
+TensorEngine* b = tensor((f64[]){3.0, E}, (int[]){1, N}, false);
+TensorEngine* c = add(a, b);
+backward(c);
+
+p(a); // a->grad is [1.000000]
+p(b); // b->grad is [1.000000]
+
+free_tensor(a);
+free_tensor(b);
+free_tensor(c);
+```
+
+> Second Example
+```
+TensorEngine* a = ones((int[]){2, 2, N}, false);
+TensorEngine* b = full((int[]){2, 2, N}, 5.0, false);
+TensorEngine* c = add(a, b);
+backward(c);
+
+p(a); // a->grad is [[1, 1], [1, 1]]
+
+free_tensor(a);
+free_tensor(b);
+free_tensor(c);
+```
+
+## sub_backward_fn
+```
+The `sub_backward_fn` is the backward callback function for element-wise subtraction 
+($c = a - b$). Since $\frac{\partial c}{\partial a} = 1$ and $\frac{\partial c}{\partial b} = -1$, 
+it accumulates `grad_output` into $a$ and `-grad_output` into $b$.
+```
+
+> Signature
+```
+void sub_backward_fn(GradFn *self, TensorEngine *grad_output);
+```
+
+> Example
+```
+TensorEngine* a = tensor((f64[]){10.0, E}, (int[]){1, N}, false);
+TensorEngine* b = tensor((f64[]){4.0, E}, (int[]){1, N}, false);
+TensorEngine* c = sub(a, b);
+backward(c);
+
+p(a); // a->grad is [1.000000]
+p(b); // b->grad is [-1.000000]
+
+free_tensor(a);
+free_tensor(b);
+free_tensor(c);
+```
+
+> Second Example
+```
+TensorEngine* a = ones((int[]){3, N}, false);
+TensorEngine* b = ones((int[]){3, N}, false);
+TensorEngine* c = sub(a, b);
+backward(c);
+
+p(b); // b->grad is [-1.000000, -1.000000, -1.000000]
+
+free_tensor(a);
+free_tensor(b);
+free_tensor(c);
+```
+
+## mul_backward_fn
+```
+The `mul_backward_fn` is the backward callback function for element-wise multiplication 
+($c = a \cdot b$). Using the product rule, $\frac{\partial c}{\partial a} = b$ and 
+$\frac{\partial c}{\partial b} = a$. It computes $\text{grad\_output} \cdot b$ and 
+accumulates it into $a$, and computes $\text{grad\_output} \cdot a$ and accumulates it into $b$.
+```
+
+> Signature
+```
+void mul_backward_fn(GradFn *self, TensorEngine *grad_output);
+```
+
+> Example
+```
+TensorEngine* a = tensor((f64[]){3.0, 4.0, E}, (int[]){2, N}, false);
+TensorEngine* b = tensor((f64[]){5.0, 6.0, E}, (int[]){2, N}, false);
+TensorEngine* c = mlt(a, b);
+backward(c);
+
+p(a); // a->grad is [5.000000, 6.000000]
+p(b); // b->grad is [3.000000, 4.000000]
+
+free_tensor(a);
+free_tensor(b);
+free_tensor(c);
+```
+
+> Second Example
+```
+TensorEngine* x = tensor((f64[]){4.0, E}, (int[]){1, N}, false);
+TensorEngine* y = mlt(x, x); // y = x^2
+backward(y);
+
+p(x); // x->grad is [8.000000] (2*x)
+
+free_tensor(x);
+free_tensor(y);
+```
+
+## div_backward_fn
+```
+The `div_backward_fn` is the backward callback function for element-wise division 
+($c = a / b$). Using the quotient rule, $\frac{\partial c}{\partial a} = \frac{1}{b}$ 
+and $\frac{\partial c}{\partial b} = -\frac{a}{b^2}$. It computes $\text{grad\_output} / b$ 
+for $a$, and $-\text{grad\_output} \cdot a / b^2$ for $b$.
+```
+
+> Signature
+```
+void div_backward_fn(GradFn *self, TensorEngine *grad_output);
+```
+
+> Example
+```
+TensorEngine* a = tensor((f64[]){12.0, E}, (int[]){1, N}, false);
+TensorEngine* b = tensor((f64[]){4.0, E}, (int[]){1, N}, false);
+TensorEngine* c = divt(a, b);
+backward(c);
+
+p(a); // a->grad is [0.250000] (1/4)
+p(b); // b->grad is [-0.750000] (-12/16)
+
+free_tensor(a);
+free_tensor(b);
+free_tensor(c);
+```
+
+> Second Example
+```
+TensorEngine* a = tensor((f64[]){6.0, 8.0, E}, (int[]){2, N}, false);
+TensorEngine* b = tensor((f64[]){2.0, 2.0, E}, (int[]){2, N}, false);
+TensorEngine* c = divt(a, b);
+backward(c);
+
+p(a); // a->grad is [0.500000, 0.500000]
+p(b); // b->grad is [-1.500000, -2.000000]
+
+free_tensor(a);
+free_tensor(b);
+free_tensor(c);
+```
+
+## add_broad_backward_fn
+```
+The `add_broad_backward_fn` is the backward callback for broadcast addition. It 
+reduces `grad_output` via `unbroadcast_to` to match $a$'s original shape and accumulates 
+into $a$, and similarly reduces `grad_output` to match $b$'s original shape and accumulates 
+into $b$.
+```
+
+> Signature
+```
+void add_broad_backward_fn(GradFn *self, TensorEngine *grad_output);
+```
+
+> Example
+```
+TensorEngine* A = ones((int[]){2, 3, N}, false);
+TensorEngine* B = ones((int[]){1, 3, N}, false);
+TensorEngine* C = add_broad(A, B);
+backward(C);
+
+p(A); // A->grad is shape [2, 3] filled with 1.0
+p(B); // B->grad is shape [1, 3] filled with 2.0 (summed along dim 0)
+
+free_tensor(A);
+free_tensor(B);
+free_tensor(C);
+```
+
+> Second Example
+```
+TensorEngine* A = full((int[]){3, 1, N}, 2.0, false);
+TensorEngine* B = full((int[]){1, 4, N}, 3.0, false);
+TensorEngine* C = add_broad(A, B);
+backward(C);
+
+p(A); // A->grad is [4.0, 4.0, 4.0] (summed along dim 1)
+p(B); // B->grad is [3.0, 3.0, 3.0, 3.0] (summed along dim 0)
+
+free_tensor(A);
+free_tensor(B);
+free_tensor(C);
+```
+
+## sub_broad_backward_fn
+```
+The `sub_broad_backward_fn` is the backward callback for broadcast subtraction. It 
+reduces `grad_output` to $a$'s shape for $a$, and reduces `-grad_output` to $b$'s shape 
+for $b$.
+```
+
+> Signature
+```
+void sub_broad_backward_fn(GradFn *self, TensorEngine *grad_output);
+```
+
+> Example
+```
+TensorEngine* A = ones((int[]){2, 3, N}, false);
+TensorEngine* B = ones((int[]){1, 3, N}, false);
+TensorEngine* C = sub_broad(A, B);
+backward(C);
+
+p(B); // B->grad is shape [1, 3] filled with -2.0
+
+free_tensor(A);
+free_tensor(B);
+free_tensor(C);
+```
+
+> Second Example
+```
+TensorEngine* A = full((int[]){2, 2, N}, 5.0, false);
+TensorEngine* B = full((int[]){2, N}, 2.0, false);
+TensorEngine* C = sub_broad(A, B);
+backward(C);
+
+p(B); // B->grad is [-2.0, -2.0]
+
+free_tensor(A);
+free_tensor(B);
+free_tensor(C);
+```
+
+## mul_broad_backward_fn
+```
+The `mul_broad_backward_fn` is the backward callback for broadcast multiplication. It 
+computes $\text{grad\_output} \cdot b$, unbroadcasts the product to $a$'s shape, and 
+accumulates it into $a$; and computes $\text{grad\_output} \cdot a$, unbroadcasts it to 
+$b$'s shape, and accumulates it into $b$.
+```
+
+> Signature
+```
+void mul_broad_backward_fn(GradFn *self, TensorEngine *grad_output);
+```
+
+> Example
+```
+TensorEngine* A = tensor((f64[]){1.0, 2.0, 3.0, 4.0, 5.0, 6.0, E}, (int[]){2, 3, N}, false);
+TensorEngine* B = tensor((f64[]){2.0, 2.0, 2.0, E}, (int[]){1, 3, N}, false);
+TensorEngine* C = mlt_broad(A, B);
+backward(C);
+
+p(B); // B->grad is shape [1, 3] with values [5.000000, 7.000000, 9.000000]
+
+free_tensor(A);
+free_tensor(B);
+free_tensor(C);
+```
+
+> Second Example
+```
+TensorEngine* A = full((int[]){3, 1, N}, 4.0, false);
+TensorEngine* B = full((int[]){1, 2, N}, 5.0, false);
+TensorEngine* C = mlt_broad(A, B);
+backward(C);
+
+p(A); // A->grad is [10.0, 10.0, 10.0] (5.0 * 2)
+
+free_tensor(A);
+free_tensor(B);
+free_tensor(C);
+```
+
+## div_broad_backward_fn
+```
+The `div_broad_backward_fn` is the backward callback for broadcast division. It computes 
+$\text{grad\_output} / b$ and unbroadcasts to $a$'s shape; and computes 
+$-\text{grad\_output} \cdot a / b^2$ and unbroadcasts to $b$'s shape.
+```
+
+> Signature
+```
+void div_broad_backward_fn(GradFn *self, TensorEngine *grad_output);
+```
+
+> Example
+```
+TensorEngine* A = tensor((f64[]){10.0, 20.0, 30.0, 40.0, E}, (int[]){2, 2, N}, false);
+TensorEngine* B = tensor((f64[]){2.0, 2.0, E}, (int[]){1, 2, N}, false);
+TensorEngine* C = div_broad(A, B);
+backward(C);
+
+p(A); // A->grad is shape [2, 2] with values [0.5, 0.5, 0.5, 0.5]
+p(B); // B->grad is shape [1, 2] with values [-10.0, -15.0]
+
+free_tensor(A);
+free_tensor(B);
+free_tensor(C);
+```
+
+> Second Example
+```
+TensorEngine* A = ones((int[]){3, 3, N}, false);
+TensorEngine* B = full((int[]){1, 3, N}, 5.0, false);
+TensorEngine* C = div_broad(A, B);
+backward(C);
+
+p(A); // A->grad is [0.2, 0.2, ...]
+
+free_tensor(A);
+free_tensor(B);
+free_tensor(C);
+```
+
+## dot_backward_fn
+```
+The `dot_backward_fn` is the backward callback for dot products and matrix multiplications. 
+It supports 1D $\times$ 1D inner products, 2D $\times$ 1D matrix-vector products, 
+1D $\times$ 2D vector-matrix products, and 2D/ND matrix multiplications ($C = A @ B$). 
+For 2D matrices, $\frac{\partial L}{\partial A} = \text{grad\_output} @ B^T$ and 
+$\frac{\partial L}{\partial B} = A^T @ \text{grad\_output}$.
+```
+
+> Signature
+```
+void dot_backward_fn(GradFn *self, TensorEngine *grad_output);
+```
+
+> Example
+```
+f64 dA[] = {1, 2, 3, 4, E};
+f64 dB[] = {5, 6, 7, 8, E};
+int sh[] = {2, 2, N};
+
+TensorEngine* A = tensor(dA, sh, false);
+TensorEngine* B = tensor(dB, sh, false);
+TensorEngine* C = dot_prod(A, B);
+
+backward(C);
+
+p(A); // A->grad is [[11.0, 15.0], [11.0, 15.0]]
+p(B); // B->grad is [[4.0, 4.0], [6.0, 6.0]]
+
+free_tensor(A);
+free_tensor(B);
+free_tensor(C);
+```
+
+> Second Example
+```
+// 2D @ 1D Matrix-Vector product
+TensorEngine* A = tensor((f64[]){1, 2, 3, 4, E}, (int[]){2, 2, N}, false);
+TensorEngine* x = tensor((f64[]){2, 3, E}, (int[]){2, N}, false);
+TensorEngine* y = dot_prod(A, x);
+
+backward(y);
+
+p(A); // A->grad is [[2.0, 3.0], [2.0, 3.0]]
+p(x); // x->grad is [4.0, 6.0]
+
+free_tensor(A);
+free_tensor(x);
+free_tensor(y);
+```
+
+## transpose_backward_fn
+```
+The `transpose_backward_fn` is the backward callback for tensor transpositions. It 
+reverses the axes permutation (or inverts custom axis indices) on `grad_output` 
+and accumulates the transposed gradient back into the input tensor.
+```
+
+> Signature
+```
+void transpose_backward_fn(GradFn *self, TensorEngine *grad_output);
+```
+
+> Example
+```
+TensorEngine* x = tensor((f64[]){1, 2, 3, 4, 5, 6, E}, (int[]){2, 3, N}, false);
+TensorEngine* y = T(x);
+backward(y);
+
+p(x); // x->grad has shape [2, 3] filled with 1.0
+
+free_tensor(x);
+free_tensor(y);
+```
+
+> Second Example
+```
+TensorEngine* x = tensor((f64[]){1, 2, 3, 4, E}, (int[]){4, N}, false);
+TensorEngine* col = T(x); // Transposes 1D [4] to 2D [4, 1]
+backward(col);
+
+p(x); // x->grad is restored in 1D [4] shape
+
+free_tensor(x);
+free_tensor(col);
+```
+
+## reshape_backward_fn
+```
+The `reshape_backward_fn` is the backward callback for tensor reshaping. It extracts 
+the original input shape stored in context, reshapes `grad_output` back to that shape, 
+and accumulates the result into the input tensor.
+```
+
+> Signature
+```
+void reshape_backward_fn(GradFn *self, TensorEngine *grad_output);
+```
+
+> Example
+```
+TensorEngine* x = arange(1.0, 7.0, 1.0, false);
+int sh[] = {2, 3};
+TensorEngine* y = reshape(x, sh, 2);
+backward(y);
+
+p(x); // x->grad is in 1D [6] shape
+
+free_tensor(x);
+free_tensor(y);
+```
+
+> Second Example
+```
+TensorEngine* x = ones((int[]){2, 3, 4, N}, false);
+int sh[] = {24};
+TensorEngine* y = reshape(x, sh, 1);
+backward(y);
+
+p(x); // x->grad is in 3D [2, 3, 4] shape
+
+free_tensor(x);
+free_tensor(y);
+```
+
+## slice_backward_fn
+```
+The `slice_backward_fn` is the backward callback for tensor slicing. It scatters 
+the elements of `grad_output` into a zero tensor matching the original tensor's 
+dimensions according to the saved slice indices (`starts`, `steps`, `out_shape`, `offset`), 
+and accumulates the un-sliced gradient into the input tensor.
+```
+
+> Signature
+```
+void slice_backward_fn(GradFn *self, TensorEngine *grad_output);
+```
+
+> Example
+```
+TensorEngine* x = tensor((f64[]){10, 20, 30, 40, E}, (int[]){4, N}, false);
+int s[][3] = { {1, 3, 1} };
+TensorEngine* sl = slice(x, s, 1, 0); // slice elements at index 1 and 2
+backward(sl);
+
+p(x); // x->grad is [0.0, 1.0, 1.0, 0.0]
+
+free_tensor(x);
+free_tensor(sl);
+```
+
+> Second Example
+```
+TensorEngine* mat = ones((int[]){3, 3, N}, false);
+int s[][3] = { {0, 2, 1}, {0, 2, 1} };
+TensorEngine* sub = slice(mat, s, 2, 0);
+backward(sub);
+
+p(mat); // mat->grad has 1.0 on top-left 2x2 block and 0.0 elsewhere
+
+free_tensor(mat);
+free_tensor(sub);
+```
