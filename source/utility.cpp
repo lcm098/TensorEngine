@@ -44,8 +44,7 @@ TensorEngine* T(TensorEngine * t) {
         shape_terminated[1] = (int)cols;
         shape_terminated[2] = N;
 
-        TensorEngine *result =
-            tensor(result_array, shape_terminated, t->__GPU__);
+        TensorEngine *result = tensor(result_array, shape_terminated, t->__GPU__);
 
         free(result_array);
         free(shape_terminated);
