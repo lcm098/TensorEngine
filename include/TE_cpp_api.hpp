@@ -7,6 +7,7 @@
 #include "./arthematic.hpp"
 #include "./utility.hpp"
 #include "./tensor_factory.hpp"
+#include "./encoder.hpp"
 
 #endif
 
