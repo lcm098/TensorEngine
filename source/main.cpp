@@ -2,7 +2,6 @@
 #include "../include/utils.hpp"
 #include "../include/arthematic.hpp"
 #include "../include/utility.hpp"
-#include <cassert>
 
 int main()
 {
@@ -13,8 +12,8 @@ int main()
 
     int s6d[][3] = {
         {0, 1, 1}, // Dim 0: index 1
-        {N, N, N}, // Dim 1: all
-        {N, N, N}, // Dim 2: all
+        {0, 1, 1}, // Dim 1: index 1
+        {1, 2, 1}, // Dim 2: index 2
         {N, N, N}, // Dim 3: all
         {N, N, N}, // Dim 4: all
         {N, N, N}, // Dim 5: all
