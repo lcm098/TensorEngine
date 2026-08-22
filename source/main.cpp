@@ -3,6 +3,7 @@
 #include "../include/arthematic.hpp"
 #include "../include/utility.hpp"
 #include "../include/tensor_factory.hpp"
+#include <cstdlib>
 
 int main()
 {
@@ -60,16 +61,20 @@ int main()
     // free_tensor(t2);
 
 
-    TensorEngine* t3 = full((int[]){2, 2, 5, N}, 55.0, true);
-    p(t3);
+    // TensorEngine* t3 = full((int[]){2, 2, 5, N}, 55.0, true);
+    // p(t3);
 
 
-    TensorEngine *t4 = ones_alike(t3, false);
-    p(t4);
+    // TensorEngine *t4 = ones_alike(t3, false);
+    // p(t4);
 
     
-    free_tensor(t3);
-    free_tensor(t4);
+    // free_tensor(t3);
+    // free_tensor(t4);
+
+    TensorEngine* tx = empty((int[]){3, 3, N}, false);
+    p(tx);
+    free_tensor(tx);
 
     return 0;
 }
