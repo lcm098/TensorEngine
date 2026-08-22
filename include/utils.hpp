@@ -28,6 +28,11 @@ TensorEngine* tensor(f64 array_[], int shape_[], bool __GPU__);
 void p(TensorEngine *tensor);
 void free_tensor(TensorEngine *t);
 
+// helper methods
+size_t calculate_ndim(int shape[]);
+size_t calculate_elements(f64 array[]);
+int* calculate_strides(int shape_[], size_t ndim);
+
 #ifdef __cplusplus
 }
 #endif

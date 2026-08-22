@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdio>
+#include <cstdlib>
 #include "../include/utils.hpp"
 
 
@@ -71,7 +72,7 @@ TensorEngine* tensor(f64 array_[], int shape_[], bool __GPU__)
 		return NULL;
 	}
 
-	TensorEngine *engine = new TensorEngine;
+	TensorEngine *engine = (TensorEngine*)malloc(sizeof(TensorEngine));;
 
 	engine->size = elements;
 	engine->ndim = ndim;
@@ -80,7 +81,7 @@ TensorEngine* tensor(f64 array_[], int shape_[], bool __GPU__)
 
 	if (engine->tensor == nullptr) {
 		fprintf(stderr, "memory allocation failed for new tensor\n");
-		delete engine;
+		free(engine->tensor);
 		return NULL;
 	}
 
@@ -92,7 +93,7 @@ TensorEngine* tensor(f64 array_[], int shape_[], bool __GPU__)
 
 	if (engine->shape == nullptr) {
 		fprintf(stderr, "memory allocation failed for tensor shape\n");
-		free(engine->tensor);
+		free(engine->shape);
 		return NULL;
 	}
 
