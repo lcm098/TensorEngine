@@ -102,8 +102,17 @@ int main()
     p(t1);
     free_tensor(t1);
 
-    
 
+
+    uint8_t raw[48];
+    for (int i = 0; i < 48; i++) raw[i] = (uint8_t)(i % 256);
+
+    TensorEngine* img = _encode_image_as_tensor(raw, 4, 4, 3, false);
+    p(img);
+
+    free_tensor(img);
+
+    
 
     // TensorEngine* t = arange(10.0, 0.0, -2.0, true);
     // p(t);
