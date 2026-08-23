@@ -453,3 +453,17 @@ void runSliceNDDoubleOp(
     cudaFree(d_out_shape);
     cudaFree(d_in_strides);
 }
+
+void copyHostToDevice(double *dst_dev, const double *src_host, size_t count) {
+    cudaMemcpy(dst_dev, src_host, sizeof(double) * count, cudaMemcpyHostToDevice);
+}
+
+void copyDeviceToHost(double *dst_host, const double *src_dev, size_t count) {
+    cudaMemcpy(dst_host, src_dev, sizeof(double) * count, cudaMemcpyDeviceToHost);
+}
+
+void freeDeviceMemory(void *dev_ptr) {
+    if (dev_ptr != nullptr) {
+        cudaFree(dev_ptr);
+    }
+}

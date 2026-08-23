@@ -9,6 +9,9 @@
 #include "./tensor_factory.hpp"
 #include "./encoder.hpp"
 #include "./gradfn.hpp"
+#include "./initializer.hpp"
+#include "./linear.hpp"
+#include "./pipeline.hpp"
 
 #endif
 

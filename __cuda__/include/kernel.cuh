@@ -119,5 +119,9 @@ __global__ void sliceNDKernelD(
 __global__ void extractKernelD(const double *in, double *out, size_t count, size_t stride);
 void runExtractDoubleOp(const double *in_dev, double *h_out, size_t count, size_t stride);
 
+void copyHostToDevice(double *dst_dev, const double *src_host, size_t count);
+void copyDeviceToHost(double *dst_host, const double *src_dev, size_t count);
+void freeDeviceMemory(void *dev_ptr);
+
 
 #endif

@@ -3,35 +3,49 @@
 #include "../include/utility.hpp"
 #include "../include/tensor_factory.hpp"
 #include "../include/gradfn.hpp"
-
+#include "../include/initializer.hpp"
+#include "../include/linear.hpp"
+#include "../include/pipeline.hpp"
 
 
 int main() {
     
-    TensorEngine* t1 = tensor((f64[]){5.0, E}, (int[]){1, N}, false);
-    set_requires_grad(t1, true);
+    // TensorEngine* t1 = tensor((f64[]){5.0, E}, (int[]){1, N}, false);
+    // set_requires_grad(t1, true);
 
-    TensorEngine* t2 = tensor((f64[]){2.0, E}, (int[]){1, N}, false);
+    // TensorEngine* t2 = tensor((f64[]){2.0, E}, (int[]){1, N}, false);
 
-    TensorEngine* t3 = add(t1, t2);
+    // TensorEngine* t3 = add(t1, t2);
 
-    p(t1);
-    p(t3);
+    // p(t1);
+    // p(t3);
 
-    print_graph(t3);
+    // print_graph(t3);
 
-    backward(t3);
+    // backward(t3);
 
-    printf("\n=== After Backward ===\n");
+    // printf("\n=== After Backward ===\n");
 
-    p(t1);
-    p(t2);
-    p(t3);
+    // p(t1);
+    // p(t2);
+    // p(t3);
 
-    free_tensor(t1);
-    free_tensor(t2);
-    free_tensor(t3);
+    // free_tensor(t1);
+    // free_tensor(t2);
+    // free_tensor(t3);
 
+    
+
+    __pipeLine__ *p = build(
+        Linear_Lay(2,   4,  INIT_XAVIER_NORMAL, Tanh, BIAS_NORMAL, 0.0, 0.2, true),
+        Linear_Lay(4,  8,  INIT_XAVIER_NORMAL, Tanh, BIAS_NORMAL, 0.0, 0.2, true),
+        Linear_Lay(8,  4,   INIT_XAVIER_NORMAL, Tanh, BIAS_NORMAL, 0.0, 0.2, true),
+        Linear_Lay(4,  1,   INIT_XAVIER_NORMAL, Tanh, BIAS_NORMAL, 0.0, 0.2, true),
+        NULL
+    );
+
+    print_pipeline(p);
+    free_pipeline(p);
 
     return 0;
 }

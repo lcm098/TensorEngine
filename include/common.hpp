@@ -14,6 +14,8 @@ extern "C" {
 #include <cstddef>
 #include <climits>
 #include <cstring>
+#include <ctime>
+#include <cstdarg>
 
 typedef double f64;
 #define E -INFINITY
