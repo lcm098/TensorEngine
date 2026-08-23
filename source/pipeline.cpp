@@ -1,20 +1,19 @@
 #include "../include/pipeline.hpp"
 
-__pipeLine__* build(TensorEngine *first, ...) {
+__pipeLine__* build(Layer *first, ...) {
     if (first == NULL) {
         fprintf(stderr, "build: pipeline must contain at least one layer\n");
         return NULL;
     }
 
-    /* first pass: count how many non-NULL args were given */
     size_t count = 1;
     va_list args;
     va_start(args, first);
 
-    TensorEngine *cur = va_arg(args, TensorEngine*);
+    Layer *cur = va_arg(args, Layer*);
     while (cur != NULL) {
         count++;
-        cur = va_arg(args, TensorEngine*);
+        cur = va_arg(args, Layer*);
     }
     va_end(args);
 
@@ -24,24 +23,62 @@ __pipeLine__* build(TensorEngine *first, ...) {
         return NULL;
     }
 
-    p->layers = (TensorEngine**) malloc(sizeof(TensorEngine*) * count);
+    p->layers = (Layer**) malloc(sizeof(Layer*) * count);
     if (p->layers == NULL) {
         fprintf(stderr, "build: memory allocation failed for layer array\n");
         free(p);
         return NULL;
     }
 
-    /* second pass: actually store the pointers */
     p->layers[0] = first;
 
     va_start(args, first);
     for (size_t i = 1; i < count; i++) {
-        p->layers[i] = va_arg(args, TensorEngine*);
+        p->layers[i] = va_arg(args, Layer*);
     }
     va_end(args);
 
     p->depth = count;
     return p;
+}
+
+static void print_tensor_info(const char *label, TensorEngine *t) {
+    if (t == NULL) {
+        printf("%s: invalid tensor\n", label);
+        return;
+    }
+
+    printf("%s: shape = [", label);
+    for (size_t d = 0; d < t->ndim; d++) {
+        printf("%d", t->shape[d]);
+        if (d + 1 < t->ndim) printf(", ");
+    }
+    printf("], size = %zu, __gpu__ = %s\n", t->size, t->__GPU__ ? "true" : "false");
+}
+
+static const char *map_activation(int activation_no) {
+    switch (activation_no) {
+        case Sigmoid:
+            return "Sigmoid";
+        case ReLU:
+            return "ReLU";
+        case Tanh:
+            return "Tanh";
+        case Softmax:
+            return "Softmax";
+        case LeakyReLU:
+            return "LeakyReLU";
+        case ELU:
+            return "ELU";
+        case GELU:
+            return "GELU";
+        case Swish:
+            return "Swish";
+        case Linear:
+            return "Linear";
+        default:
+            return "Invalid Activation";
+    }
 }
 
 void print_pipeline(__pipeLine__ *pipe) {
@@ -50,58 +87,33 @@ void print_pipeline(__pipeLine__ *pipe) {
         return;
     }
 
-    printf("########## PIPELINE (%zu layers) ##########\n", pipe->depth);
+    printf("[################ PIPELINE %zu ###################]\n", pipe->depth);
 
     for (size_t i = 0; i < pipe->depth; i++) {
-        printf("---- Layer %zu ----\n", i);
+        printf("=============== Layer %zu ===============\n", i);
 
-        TensorEngine *t = pipe->layers[i];
+        Layer *layer = pipe->layers[i];
 
-        if (t == NULL) {
-            fprintf(stderr, "invalid tensor\n");
+        if (layer == NULL) {
+            fprintf(stderr, "invalid layer\n");
             continue;
         }
 
-        printf("size = %zu\n", t->size);
-        printf("ndim = %zu\n", t->ndim);
+        printf("in_feature = %d, out_feature = %d, activation = %s\n",
+               layer->in_feature, layer->out_feature, map_activation((int) layer->activation));
 
-        printf("shape = [");
-        for (size_t d = 0; d < t->ndim; d++) {
-            printf("%d", t->shape[d]);
-            if (d + 1 < t->ndim) printf(", ");
-        }
-        printf("]\n");
-
-        printf("strides = [");
-        for (size_t d = 0; d < t->ndim; d++) {
-            printf("%d", t->strides[d]);
-            if (d + 1 < t->ndim) printf(", ");
-        }
-        printf("]\n");
-
-        const char *status = t->__GPU__ ? "true" : "false";
-        printf("__gpu__ [%s]\n", status);
+        print_tensor_info("weights", layer->weights);
+        print_tensor_info("bias", layer->bias);
     }
 
-    printf("############################################\n");
+    printf("[#################################################]\n");
 }
 
 void free_pipeline(__pipeLine__ *p) {
     if (p == NULL) return;
 
     for (size_t i = 0; i < p->depth; i++) {
-        TensorEngine *t = p->layers[i];
-        if (t == NULL) continue;
-
-        if (t->__GPU__) {
-            freeDeviceMemory(t->tensor);
-        } else {
-            free(t->tensor);
-        }
-
-        free(t->shape);
-        free(t->strides);
-        free(t);
+        free_layer(p->layers[i]);
     }
 
     free(p->layers);

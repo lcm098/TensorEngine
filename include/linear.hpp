@@ -6,11 +6,26 @@
 #include "../__cuda__/include/kernel.cuh"
 #include "./arthematic.hpp"
 
+// Holds a single linear layer's configuration: weights, bias, and the
+// activation to apply AFTER the forward pass (w*x + b) is computed elsewhere.
+// No computation happens at construction time.
+typedef struct {
+    TensorEngine *weights;   // shape [in_feature, out_feature]
+    TensorEngine *bias;      // shape [1, out_feature]
+    ActivationType activation;
+    int in_feature;
+    int out_feature;
+} Layer;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-TensorEngine* Linear_Lay(
+// Builds and returns a Layer config: initializes weights + bias tensors,
+// but does NOT combine them or apply the activation. That happens later
+// in a separate forward-pass function.
+
+Layer* Linear_Lay(
     int in_feature,
     int out_feature,
     InitType BIY,          /* weight initializer */
@@ -21,6 +36,7 @@ TensorEngine* Linear_Lay(
     bool __GPU__
 );
 
+void free_layer(Layer *layer);
 
 #ifdef __cplusplus
 }
