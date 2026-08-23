@@ -1,6 +1,6 @@
 # Tensor Engine - API Collection Documentation
 
-This document provides reference documentation for all non-static functions implemented across `linear.cpp`, `initializer.cpp`, `math.cpp`, and `gradfn.cpp`.
+This document provides reference documentation for all non-static functions implemented across `linear.cpp`, `pipeline.cpp`, `initializer.cpp`, `math.cpp`, and `gradfn.cpp`.
 
 ---
 
@@ -8,6 +8,10 @@ This document provides reference documentation for all non-static functions impl
 - [Linear Layer Functions (`linear.cpp`)](#linear-layer-functions-linearcpp)
   - [Linear_Lay](#linear_lay)
   - [free_layer](#free_layer)
+- [Sequential Pipeline Functions (`pipeline.cpp`)](#sequential-pipeline-functions-pipelinecpp)
+  - [build](#build)
+  - [print_pipeline](#print_pipeline)
+  - [free_pipeline](#free_pipeline)
 - [Tensor & Bias Initializer Functions (`initializer.cpp`)](#tensor--bias-initializer-functions-initializercpp)
   - [initialize_tensor](#initialize_tensor)
   - [initialize_bias](#initialize_bias)
@@ -116,6 +120,78 @@ void free_layer(Layer *layer);
 Layer *layer = Linear_Lay(4, 2, INIT_HE_NORMAL, Sigmoid, BIAS_ZEROS, 0.0, 0.0, false);
 // ... use layer in forward / backward passes ...
 free_layer(layer);
+```
+
+---
+
+# Sequential Pipeline Functions (`pipeline.cpp`)
+
+## build
+```
+The `build` function constructs a multi-layer sequential neural network pipeline (`__pipeLine__`). 
+It accepts a variadic list of pointers to `Layer` configurations (typically initialized via `Linear_Lay`), 
+terminated by a mandatory trailing `NULL` pointer sentinel. The function determines the total depth 
+of the pipeline, dynamically allocates the layer pointer array, and preserves the execution sequence 
+of layers. If `first` is `NULL`, an error message is printed to `stderr` and `NULL` is returned.
+```
+
+> Signature
+```c
+__pipeLine__* build(Layer *first, ...);
+```
+
+> Example
+```c
+__pipeLine__ *pipe = build(
+    Linear_Lay(784, 128, INIT_XAVIER_NORMAL, ReLU, BIAS_CONSTANT, 0.01, 0.0, false),
+    Linear_Lay(128, 64,  INIT_XAVIER_NORMAL, ReLU, BIAS_CONSTANT, 0.01, 0.0, false),
+    Linear_Lay(64,  10,  INIT_XAVIER_NORMAL, Softmax, BIAS_ZEROS, 0.0, 0.0, false),
+    NULL
+);
+
+print_pipeline(pipe);
+free_pipeline(pipe);
+```
+
+---
+
+## print_pipeline
+```
+The `print_pipeline` function formats and prints structural diagnostics for an entire sequential 
+pipeline to standard output. For each layer in the network, it displays its index, input feature 
+dimension (`in_feature`), output feature dimension (`out_feature`), activation function name 
+(e.g., "Sigmoid", "ReLU", "Tanh", "Softmax", "LeakyReLU", "ELU", "GELU", "Swish", "Linear"), 
+as well as the shapes, element sizes, and GPU target flags of both weight and bias tensors.
+```
+
+> Signature
+```c
+void print_pipeline(__pipeLine__ *pipe);
+```
+
+> Example
+```c
+print_pipeline(pipe);
+```
+
+---
+
+## free_pipeline
+```
+The `free_pipeline` function deallocates an entire `__pipeLine__` sequence and all of its constituent 
+layers. It iterates over each layer, invoking `free_layer` to release weights, biases, and metadata, 
+and then frees the internal layer array and the `__pipeLine__` structure itself. Passing a `NULL` 
+pointer safely returns without operation.
+```
+
+> Signature
+```c
+void free_pipeline(__pipeLine__ *p);
+```
+
+> Example
+```c
+free_pipeline(pipe);
 ```
 
 ---
