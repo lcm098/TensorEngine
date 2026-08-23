@@ -5,6 +5,7 @@
 #include "./initializer.hpp"
 #include "../__cuda__/include/kernel.cuh"
 #include "./arthematic.hpp"
+#include "./gradfn.hpp"
 
 // Holds a single linear layer's configuration: weights, bias, and the
 // activation to apply AFTER the forward pass (w*x + b) is computed elsewhere.
@@ -37,6 +38,7 @@ Layer* Linear_Lay(
 );
 
 void free_layer(Layer *layer);
+TensorEngine* apply_activation(TensorEngine *t, ActivationType AT);
 
 #ifdef __cplusplus
 }

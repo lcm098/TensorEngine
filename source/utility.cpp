@@ -220,35 +220,75 @@ TensorEngine* arange(f64 start, f64 end, f64 step, bool gpu) {
     return result;
 }
 
-TensorEngine* reshape(TensorEngine* t, int *new_shape, size_t new_ndim) {
+TensorEngine* reshape(
+    TensorEngine* t,
+    int* new_shape,
+    size_t new_ndim
+)
+{
+    if (t == NULL) {
+        fprintf(stderr, "reshape: input tensor is NULL\n");
+        return NULL;
+    }
+
+    if (new_shape == NULL) {
+        fprintf(stderr, "reshape: new_shape is NULL\n");
+        return NULL;
+    }
+
+    if (new_ndim == 0) {
+        fprintf(stderr, "reshape: new_ndim must be greater than zero\n");
+        return NULL;
+    }
+
     size_t new_size = 1;
+
     for (size_t i = 0; i < new_ndim; i++) {
+
         if (new_shape[i] <= 0) {
-            fprintf(stderr, "reshape: shape dimensions must be positive\n");
+            fprintf(stderr,
+                    "reshape: shape dimensions must be positive\n");
             return NULL;
         }
-        new_size *= (size_t) new_shape[i];
+
+        new_size *= (size_t)new_shape[i];
     }
 
     if (new_size != t->size) {
-        fprintf(stderr, "reshape: cannot reshape tensor of size %zu into shape with size %zu\n",
-                t->size, new_size);
+        fprintf(stderr,
+                "reshape: cannot reshape tensor of size %zu "
+                "into shape with size %zu\n",
+                t->size,
+                new_size);
+
         return NULL;
     }
 
-    // +1 slot for the E (-INFINITY) sentinel
-    f64 *host_data = (f64*) malloc(sizeof(f64) * (t->size + 1));
+    f64* host_data =
+        (f64*)malloc(sizeof(f64) * (t->size + 1));
+
     if (!host_data) {
-        fprintf(stderr, "Memory allocation failed for reshape data\n");
+        fprintf(stderr,
+                "Memory allocation failed for reshape data\n");
         return NULL;
     }
 
-    memcpy(host_data, t->tensor, sizeof(f64) * t->size);
+    memcpy(
+        host_data,
+        t->tensor,
+        sizeof(f64) * t->size
+    );
+
     host_data[t->size] = E;
 
-    int *shape_terminated = (int*) malloc(sizeof(int) * (new_ndim + 1));
+    int* shape_terminated =
+        (int*)malloc(sizeof(int) * (new_ndim + 1));
+
     if (!shape_terminated) {
-        fprintf(stderr, "Memory allocation failed for new shape, while doing reshape\n");
+        fprintf(stderr,
+                "Memory allocation failed for new shape, "
+                "while doing reshape\n");
+
         free(host_data);
         return NULL;
     }
@@ -256,14 +296,32 @@ TensorEngine* reshape(TensorEngine* t, int *new_shape, size_t new_ndim) {
     for (size_t i = 0; i < new_ndim; i++) {
         shape_terminated[i] = new_shape[i];
     }
+
     shape_terminated[new_ndim] = N;
 
-    TensorEngine *result = tensor(host_data, shape_terminated, t->__GPU__);
+    TensorEngine* result =
+        tensor(
+            host_data,
+            shape_terminated,
+            t->__GPU__
+        );
 
     free(host_data);
     free(shape_terminated);
 
-    attach_reshape_grad_fn(result, t, t->shape, t->ndim);
+    if (result == NULL) {
+        fprintf(stderr,
+                "reshape: failed to create result tensor\n");
+        return NULL;
+    }
+
+    attach_reshape_grad_fn(
+        result,
+        t,
+        t->shape,
+        t->ndim
+    );
+
     return result;
 }
 

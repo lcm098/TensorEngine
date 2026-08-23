@@ -65,11 +65,9 @@ void zero_grad(struct TensorEngine *t);
 void print_graph(struct TensorEngine *t);
 
 // Execute the backward pass using reverse topological sort traversal
-#ifdef __cplusplus
-void backward(struct TensorEngine *root, struct TensorEngine *grad_output = nullptr);
-#else
+
 void backward(struct TensorEngine *root, struct TensorEngine *grad_output);
-#endif
+
 
 // ============================================================================
 // Internal Graph Construction & Helper API

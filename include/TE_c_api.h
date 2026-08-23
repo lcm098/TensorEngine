@@ -13,6 +13,10 @@
 #include "./linear.hpp"
 #include "./pipeline.hpp"
 #include "./math.hpp"
+#include "./random.hpp"
+#include "./forward.hpp"
+#include "./optimizer.hpp"
+#include "./__constants__.hpp"
 
 #endif
 

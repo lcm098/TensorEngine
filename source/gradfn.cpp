@@ -758,7 +758,7 @@ void dot_backward_fn(GradFn *self, TensorEngine *grad_output) {
         free_tensor(da);
 
         // dB = A^T [K, M] @ grad_output [M] -> [K]
-        TensorEngine *at = T(a);
+        TensorEngine *at = T(a, NULL);
         TensorEngine *db = dot_prod(at, grad_output);
         accumulate_grad(b, db);
         free_tensor(at);
@@ -767,7 +767,7 @@ void dot_backward_fn(GradFn *self, TensorEngine *grad_output) {
     // 1D @ 2D (Vector-Matrix product)
     else if (a->ndim == 1 && b->ndim == 2) {
         // da = grad_output [P] @ B^T [P, K] -> [K]
-        TensorEngine *bt = T(b);
+        TensorEngine *bt = T(b, NULL);
         TensorEngine *da = dot_prod(grad_output, bt);
         accumulate_grad(a, da);
         free_tensor(bt);
@@ -788,13 +788,13 @@ void dot_backward_fn(GradFn *self, TensorEngine *grad_output) {
     }
     // 2D @ 2D / ND @ ND (Standard Matrix product: dA = dC @ B^T, dB = A^T @ dC)
     else {
-        TensorEngine *bt = T(b);
+        TensorEngine *bt = T(b, NULL);
         TensorEngine *da = dot_prod(grad_output, bt);
         accumulate_grad(a, da);
         free_tensor(bt);
         free_tensor(da);
 
-        TensorEngine *at = T(a);
+        TensorEngine *at = T(a, NULL);
         TensorEngine *db = dot_prod(at, grad_output);
         accumulate_grad(b, db);
         free_tensor(at);
@@ -836,7 +836,7 @@ void transpose_backward_fn(GradFn *self, TensorEngine *grad_output) {
 
     if (ctx == nullptr || ctx->axes == nullptr) {
         // Default transpose: reverse axes
-        TensorEngine *da = T(grad_output);
+        TensorEngine *da = T(grad_output, NULL);
         accumulate_grad(input, da);
         free_tensor(da);
     } else {

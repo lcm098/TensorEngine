@@ -8,6 +8,9 @@
 #include "../include/pipeline.hpp"
 #include "../include/math.hpp"
 #include "../include/random.hpp"
+#include "../include/forward.hpp"
+#include "../include/optimizer.hpp"
+#include "../include/__constants__.hpp"
 
 int main() {
     
@@ -109,16 +112,161 @@ int main() {
     // free_tensor(picked);
 
 
-    random_seed(42);
-    TensorEngine *t1 = rand_f64(1, 10, (int[]){1, 2, 5, N}, false);
-    p(t1);
+    // random_seed(42);
+    // TensorEngine *t1 = rand_f64(1, 10, (int[]){1, 2, 5, N}, false);
+    // p(t1);
+
+    // random_seed(42);
+    // TensorEngine *t2 = rand_f64(1, 10, (int[]){1, 2, 5, N}, false);
+    // p(t2);
+
+    // free_tensor(t1);
+    // free_tensor(t2);
+
+
 
     random_seed(42);
-    TensorEngine *t2 = rand_f64(1, 10, (int[]){1, 2, 5, N}, false);
-    p(t2);
 
-    free_tensor(t1);
-    free_tensor(t2);
+    // ------------------------------------------------------------
+    // 1. Build training data: x in [-pi, pi], target = [cos(x), sin(x)]
+    // ------------------------------------------------------------
+    const int N_SAMPLES = 1024;
+
+    TensorEngine *x = linspace(-PI, PI, N_SAMPLES, false);
+    int xshape[] = {N_SAMPLES, 1};
+    x = reshape(x, xshape, 2); // [64, 1]
+
+    TensorEngine *cos_x = _cos(x);
+    TensorEngine *sin_x = _sin(x);
+
+    f64 *target_data = (f64*) malloc(sizeof(f64) * (N_SAMPLES * 2 + 1));
+    for (int i = 0; i < N_SAMPLES; i++) {
+        target_data[i*2 + 0] = cos_x->tensor[i];
+        target_data[i*2 + 1] = sin_x->tensor[i];
+    }
+    target_data[N_SAMPLES * 2] = E;
+
+    int target_shape[] = {N_SAMPLES, 2, N};
+    TensorEngine *target = tensor(target_data, target_shape, false);
+    free(target_data);
+    free_tensor(cos_x);
+    free_tensor(sin_x);
+
+    // ------------------------------------------------------------
+    // 2. Build a small network: 1 -> 16 -> 16 -> 2
+    // ------------------------------------------------------------
+    __pipeLine__ *pipe = build(
+        Linear_Lay(1, 16, INIT_XAVIER_NORMAL, Tanh, BIAS_ZEROS, 0.0, 0.0, false),
+        Linear_Lay(16, 16, INIT_XAVIER_NORMAL, Tanh, BIAS_ZEROS, 0.0, 0.0, false),
+        Linear_Lay(16, 2, INIT_XAVIER_NORMAL, Tanh, BIAS_ZEROS, 0.0, 0.0, false),
+        NULL
+    );
+
+    if (pipe == NULL) {
+        fprintf(stderr, "Failed to build pipeline\n");
+        return 1;
+    }
+
+    for (size_t i = 0; i < pipe->depth; i++) {
+        set_requires_grad(pipe->layers[i]->weights, true);
+        set_requires_grad(pipe->layers[i]->bias, true);
+    }
+
+    // Adam optimizer state, one per trainable tensor
+    OptState *w_state[3];
+    OptState *b_state[3];
+    for (size_t i = 0; i < pipe->depth; i++) {
+        w_state[i] = optstate_create(pipe->layers[i]->weights->size);
+        b_state[i] = optstate_create(pipe->layers[i]->bias->size);
+    }
+
+    f64 lr = 0.01;
+    int epochs = 3000;
+
+    // ------------------------------------------------------------
+    // 3. Training loop
+    // ------------------------------------------------------------
+    for (int epoch = 0; epoch < epochs; epoch++) {
+
+        for (size_t i = 0; i < pipe->depth; i++) {
+            zero_grad(pipe->layers[i]->weights);
+            zero_grad(pipe->layers[i]->bias);
+        }
+
+        TensorEngine *pred = forward(pipe, x); // [64, 2]
+
+        // MSE loss = mean((pred - target)^2)
+        TensorEngine *diff = sub(pred, target);
+
+        int flat_shape[] = {N_SAMPLES * 2};
+        TensorEngine *flat = reshape(diff, flat_shape, 1);
+
+        TensorEngine *sum_sq = dot_prod(flat, flat); // shape [1], sum of squares
+
+        f64 mean_val[] = {1.0 / (N_SAMPLES * 2), E};
+        int mean_shape[] = {1, N};
+        TensorEngine *mean_scalar = tensor(mean_val, mean_shape, false);
+
+        TensorEngine *loss = mlt(sum_sq, mean_scalar);
+
+        backward(loss, NULL);
+
+        for (size_t i = 0; i < pipe->depth; i++) {
+            Layer *layer = pipe->layers[i];
+
+            TensorEngine *new_w = adam_update(layer->weights, w_state[i], lr, 0.9, 0.999, 1e-8);
+            if (new_w) { free_tensor(layer->weights); layer->weights = new_w; }
+
+            TensorEngine *new_b = adam_update(layer->bias, b_state[i], lr, 0.9, 0.999, 1e-8);
+            if (new_b) { free_tensor(layer->bias); layer->bias = new_b; }
+        }
+
+        if (epoch % 300 == 0 || epoch == epochs - 1) {
+            printf("epoch %4d | loss = %f\n", epoch, loss->tensor[0]);
+        }
+
+        free_tensor(pred);
+        free_tensor(diff);
+        free_tensor(flat);
+        free_tensor(sum_sq);
+        free_tensor(mean_scalar);
+        free_tensor(loss);
+    }
+
+    // ------------------------------------------------------------
+    // 4. Test on a few unseen points
+    // ------------------------------------------------------------
+    printf("\n--- test predictions [cos(x), sin(x)] ---\n");
+
+    f64 test_vals[] = {0.0, PI/6, PI/4, PI/2, PI, -PI/2, E};
+    int test_shape[] = {6, 1, N};
+    TensorEngine *test_x = tensor(test_vals, test_shape, false);
+
+    TensorEngine *test_pred = forward(pipe, test_x);
+    p(test_pred);
+
+    printf("\n--- ground truth ---\n");
+    TensorEngine *true_cos = _cos(test_x);
+    TensorEngine *true_sin = _sin(test_x);
+    p(true_cos);
+    p(true_sin);
+
+    // ------------------------------------------------------------
+    // 5. Cleanup
+    // ------------------------------------------------------------
+    free_tensor(x);
+    free_tensor(target);
+    free_tensor(test_x);
+    free_tensor(test_pred);
+    free_tensor(true_cos);
+    free_tensor(true_sin);
+
+    for (size_t i = 0; i < pipe->depth; i++) {
+        optstate_free(w_state[i]);
+        optstate_free(b_state[i]);
+    }
+    free_pipeline(pipe);
+
 
     return 0;
 }

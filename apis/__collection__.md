@@ -406,7 +406,7 @@ the `grad` buffer of saved operand tensors.
 
 > Signature
 ```c
-void backward(struct TensorEngine *root, struct TensorEngine *grad_output = nullptr);
+void backward(struct TensorEngine *root, struct TensorEngine *grad_output);
 ```
 
 > Example
@@ -415,7 +415,7 @@ TensorEngine *a = tensor((f64[]){2.0, E}, (int[]){1, N}, false);
 set_requires_grad(a, true);
 
 TensorEngine *b = mlt(a, a); // b = a^2
-backward(b);
+backward(b, NULL);
 
 p(a); // a->grad is 2*a = [4.000000]
 ```

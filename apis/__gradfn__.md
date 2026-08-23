@@ -15,7 +15,7 @@ and the function returns safely.
 
 > Signature
 ```
-void backward(TensorEngine *root, TensorEngine *grad_output = nullptr);
+void backward(TensorEngine *root, TensorEngine *grad_output);
 ```
 
 > Example
@@ -32,7 +32,7 @@ TensorEngine* c = tensor(dc, shape, false);
 TensorEngine* ab = mlt(a, b);
 TensorEngine* z = add(ab, c);
 
-backward(z);
+backward(z, NULL);
 
 p(a); // a->grad is [4.000000, 5.000000]
 p(b); // b->grad is [2.000000, 3.000000]
