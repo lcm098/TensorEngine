@@ -31,7 +31,10 @@ typedef enum GradFnType {
     OP_TRANSPOSE,
     OP_RESHAPE,
     OP_SLICE,
-    OP_CUSTOM
+    OP_CUSTOM,
+    OP_COS,
+    OP_SIN,
+    OP_CLAMP,
 } GradFnType;
 
 // ============================================================================
@@ -111,6 +114,10 @@ void transpose_backward_fn(GradFn *self, struct TensorEngine *grad_output);
 void reshape_backward_fn(GradFn *self, struct TensorEngine *grad_output);
 void slice_backward_fn(GradFn *self, struct TensorEngine *grad_output);
 
+void _cos_backward_fn(GradFn *self, struct TensorEngine *grad_output);
+void _sin_backward_fn(GradFn *self, struct TensorEngine *grad_output);
+void _clamp_backward_fn(GradFn *self, struct TensorEngine *grad_output);
+
 // ============================================================================
 // Graph Attachment Helpers (called by forward operators)
 // ============================================================================
@@ -154,6 +161,13 @@ void attach_slice_grad_fn(
     const int *steps,
     const int *out_shape,
     int offset
+);
+
+void attach_clamp_grad_fn(
+    struct TensorEngine *result,
+    struct TensorEngine *input,
+    f64 low,
+    f64 high
 );
 
 #ifdef __cplusplus

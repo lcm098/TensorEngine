@@ -6,6 +6,7 @@
 #include "../include/arthematic.hpp"
 #include "../include/utility.hpp"
 #include "../include/tensor_factory.hpp"
+#include "../include/math.hpp"
 
 
 // ============================================================================
@@ -505,6 +506,130 @@ void div_backward_fn(GradFn *self, TensorEngine *grad_output) {
     }
 }
 
+// c = cos(a)  =>  da = -dc * sin(a)
+void _cos_backward_fn(GradFn *self, struct TensorEngine *grad_output) {
+    if (!self || !grad_output || self->num_saved < 1) return;
+    TensorEngine *input = self->saved_tensors[0];
+    if (!input) return;
+
+    f64 *da_data = (f64*) malloc(sizeof(f64) * (input->size + 1));
+    if (!da_data) return;
+
+    for (size_t i = 0; i < input->size; i++) {
+        da_data[i] = grad_output->tensor[i] * (-std::sin(input->tensor[i]));
+    }
+    da_data[input->size] = E;
+
+    int *sh = (int*) malloc(sizeof(int) * (input->ndim + 1));
+    if (!sh) {
+        free(da_data);
+        return;
+    }
+    for (size_t i = 0; i < input->ndim; i++) {
+        sh[i] = input->shape[i];
+    }
+    sh[input->ndim] = N;
+
+    TensorEngine *da = tensor(da_data, sh, input->__GPU__);
+    free(da_data);
+    free(sh);
+
+    if (da) {
+        accumulate_grad(input, da);
+        free_tensor(da);
+    }
+}
+
+// c = sin(a)  =>  da = dc * cos(a)
+void _sin_backward_fn(GradFn *self, struct TensorEngine *grad_output) {
+    if (!self || !grad_output || self->num_saved < 1) return;
+    TensorEngine *input = self->saved_tensors[0];
+    if (!input) return;
+
+    f64 *da_data = (f64*) malloc(sizeof(f64) * (input->size + 1));
+    if (!da_data) return;
+
+    for (size_t i = 0; i < input->size; i++) {
+        da_data[i] = grad_output->tensor[i] * std::cos(input->tensor[i]);
+    }
+    da_data[input->size] = E;
+
+    int *sh = (int*) malloc(sizeof(int) * (input->ndim + 1));
+    if (!sh) {
+        free(da_data);
+        return;
+    }
+    for (size_t i = 0; i < input->ndim; i++) {
+        sh[i] = input->shape[i];
+    }
+    sh[input->ndim] = N;
+
+    TensorEngine *da = tensor(da_data, sh, input->__GPU__);
+    free(da_data);
+    free(sh);
+
+    if (da) {
+        accumulate_grad(input, da);
+        free_tensor(da);
+    }
+}
+
+// ---------- Clamp Backward ----------
+typedef struct {
+    f64 low;
+    f64 high;
+} ClampCtx;
+
+static void release_clamp_ctx(void *context) {
+    ClampCtx *ctx = (ClampCtx*) context;
+    if (ctx) {
+        free(ctx);
+    }
+}
+
+// c = clamp(a, low, high)  =>  da = dc if low <= a <= high else 0
+void _clamp_backward_fn(GradFn *self, struct TensorEngine *grad_output) {
+    if (!self || !grad_output || self->num_saved < 1) return;
+    TensorEngine *input = self->saved_tensors[0];
+    if (!input) return;
+
+    ClampCtx *ctx = (ClampCtx*) self->context;
+    f64 low = ctx ? ctx->low : -INFINITY;
+    f64 high = ctx ? ctx->high : INFINITY;
+
+    f64 *da_data = (f64*) malloc(sizeof(f64) * (input->size + 1));
+    if (!da_data) return;
+
+    for (size_t i = 0; i < input->size; i++) {
+        f64 x = input->tensor[i];
+        if (x >= low && x <= high) {
+            da_data[i] = grad_output->tensor[i];
+        } else {
+            da_data[i] = 0.0;
+        }
+    }
+    da_data[input->size] = E;
+
+    int *sh = (int*) malloc(sizeof(int) * (input->ndim + 1));
+    if (!sh) {
+        free(da_data);
+        return;
+    }
+    for (size_t i = 0; i < input->ndim; i++) {
+        sh[i] = input->shape[i];
+    }
+    sh[input->ndim] = N;
+
+    TensorEngine *da = tensor(da_data, sh, input->__GPU__);
+    free(da_data);
+    free(sh);
+
+    if (da) {
+        accumulate_grad(input, da);
+        free_tensor(da);
+    }
+}
+
 // ============================================================================
 // Backward Implementations: Broadcast Arithmetic
 // ============================================================================
@@ -925,5 +1050,25 @@ void attach_slice_grad_fn(
     attach_unary_grad_fn(
         result, input, "SliceBackward", OP_SLICE,
         slice_backward_fn, ctx, release_slice_ctx
+    );
+}
+
+void attach_clamp_grad_fn(
+    TensorEngine *result,
+    TensorEngine *input,
+    f64 low,
+    f64 high)
+{
+    if (!result || !input) return;
+
+    ClampCtx *ctx = (ClampCtx*) malloc(sizeof(ClampCtx));
+    if (ctx) {
+        ctx->low  = low;
+        ctx->high = high;
+    }
+
+    attach_unary_grad_fn(
+        result, input, "ClampBackward", OP_CLAMP,
+        _clamp_backward_fn, ctx, release_clamp_ctx
     );
 }

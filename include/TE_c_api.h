@@ -12,6 +12,7 @@
 #include "./initializer.hpp"
 #include "./linear.hpp"
 #include "./pipeline.hpp"
+#include "./math.hpp"
 
 #endif
 
